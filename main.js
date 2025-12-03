@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { kaleidoscopeVertexShader, kaleidoscopeFragmentShader } from './kaleidoscopeShader.js';
-import { ObjectChamber } from './ObjectChamber.js?v=5';
+import { ObjectChamber } from './ObjectChamber.js?v=100';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -22,7 +22,7 @@ const scene = new THREE.Scene();
 const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
 // Object Chamber (The Source)
-const chamber = new ObjectChamber(renderer);
+const chamber = new ObjectChamber(renderer, window.innerWidth, window.innerHeight);
 chamber.resize(window.innerWidth, window.innerHeight);
 
 // Shader Material
@@ -64,51 +64,79 @@ let lastMouseX = 0;
 let lastMouseY = 0;
 let rotationVelocity = 0; // For inertia
 let targetRotationVelocity = 0;
+let lastInteractionTime = 0;
+const IDLE_THRESHOLD = 30.0; // Seconds
 
 // --- UI Controls ---
-const btnBuild = document.getElementById('btn-build');
-const inputSegments = document.getElementById('input-segments');
-const inputCount = document.getElementById('input-count');
-const groupMirrors = document.getElementById('group-mirrors');
-const groupCount = document.getElementById('group-count');
-const checkChamber = document.getElementById('check-chamber');
-const valueSegments = document.getElementById('value-segments');
-const valueCount = document.getElementById('value-count');
-const instructions = document.querySelector('.instructions');
+let btnBuild, inputSegments, inputCount, groupMirrors, groupCount, checkChamber, valueSegments, valueCount, instructions, speedSlider, valueSpeed;
 
-btnBuild.addEventListener('click', () => {
-    // Pass current count value if in chamber mode, else undefined (random)
-    const count = checkChamber.checked ? parseInt(inputCount.value) : undefined;
-    chamber.buildNew(count);
-});
+document.addEventListener('DOMContentLoaded', () => {
+    btnBuild = document.getElementById('btn-build');
+    inputSegments = document.getElementById('input-segments');
+    inputCount = document.getElementById('input-count');
+    groupMirrors = document.getElementById('group-mirrors');
+    groupCount = document.getElementById('group-count');
+    checkChamber = document.getElementById('check-chamber');
+    valueSegments = document.getElementById('value-segments');
+    valueCount = document.getElementById('value-count');
+    instructions = document.querySelector('.instructions');
+    speedSlider = document.getElementById('speedSlider');
+    valueSpeed = document.getElementById('value-speed');
 
-inputSegments.addEventListener('input', (e) => {
-    uniforms.uSegments.value = parseFloat(e.target.value);
-    valueSegments.innerText = e.target.value;
-});
+    if (btnBuild) {
+        btnBuild.addEventListener('click', () => {
+            // Pass current count value if in chamber mode, else undefined (random)
+            const count = checkChamber.checked ? parseInt(inputCount.value) : undefined;
+            chamber.buildNew(count);
+            lastInteractionTime = clock.getElapsedTime();
+        });
+    }
 
-// Debounce buildNew for performance
-let buildTimeout;
-inputCount.addEventListener('input', (e) => {
-    const count = parseInt(e.target.value);
-    valueCount.innerText = count;
-    clearTimeout(buildTimeout);
-    buildTimeout = setTimeout(() => {
-        chamber.buildNew(count);
-    }, 100);
-});
+    if (inputSegments) {
+        inputSegments.addEventListener('input', (e) => {
+            uniforms.uSegments.value = parseFloat(e.target.value);
+            valueSegments.innerText = e.target.value;
+            lastInteractionTime = clock.getElapsedTime();
+        });
+    }
 
-checkChamber.addEventListener('change', (e) => {
-    if (e.target.checked) {
-        // Show Item Count, Hide Mirrors
-        groupMirrors.style.display = 'none';
-        groupCount.style.display = 'flex';
-        instructions.style.display = 'none';
-    } else {
-        // Show Mirrors, Hide Item Count
-        groupMirrors.style.display = 'flex';
-        groupCount.style.display = 'none';
-        instructions.style.display = 'block';
+    if (speedSlider) {
+        speedSlider.addEventListener('input', (e) => {
+            valueSpeed.innerText = e.target.value;
+            lastInteractionTime = clock.getElapsedTime();
+        });
+    }
+
+    // Debounce buildNew for performance
+    let buildTimeout;
+    if (inputCount) {
+        inputCount.addEventListener('input', (e) => {
+            const count = parseInt(e.target.value);
+            valueCount.innerText = count;
+            clearTimeout(buildTimeout);
+            buildTimeout = setTimeout(() => {
+                chamber.buildNew(count);
+            }, 300);
+            lastInteractionTime = clock.getElapsedTime();
+        });
+    }
+
+    if (checkChamber) {
+        checkChamber.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                groupMirrors.style.display = 'none';
+                groupCount.style.display = 'flex';
+                instructions.innerText = 'Drag to Rotate View • Scroll to Zoom';
+                // Build with current count immediately
+                chamber.buildNew(parseInt(inputCount.value));
+            } else {
+                groupMirrors.style.display = 'flex';
+                groupCount.style.display = 'none';
+                instructions.innerText = 'Drag to Rotate & Color • Scroll to Zoom';
+                chamber.buildNew(); // Random count for kaleidoscope
+            }
+            lastInteractionTime = clock.getElapsedTime();
+        });
     }
 });
 
@@ -125,6 +153,7 @@ const onStart = (x, y) => {
     lastMouseX = x;
     lastMouseY = y;
     targetRotationVelocity = 0;
+    lastInteractionTime = clock.getElapsedTime();
 };
 
 const onMove = (x, y) => {
@@ -133,6 +162,8 @@ const onMove = (x, y) => {
     const hue = y / window.innerHeight;
     const intensity = 0.5 + (1.0 - (y / window.innerHeight)) * 1.5; // Top is brighter
     chamber.updateEnvironment(hue, intensity);
+
+    lastInteractionTime = clock.getElapsedTime();
 
     if (!isDragging) return;
     const deltaX = x - lastMouseX;
@@ -152,6 +183,7 @@ const onMove = (x, y) => {
 
 const onEnd = () => {
     isDragging = false;
+    lastInteractionTime = clock.getElapsedTime();
 };
 
 // Mouse Events
@@ -174,6 +206,7 @@ container.addEventListener('wheel', (e) => {
     let newZoom = uniforms.uZoom.value + e.deltaY * -zoomSpeed;
     newZoom = Math.max(0.5, Math.min(3.0, newZoom));
     uniforms.uZoom.value = newZoom;
+    lastInteractionTime = clock.getElapsedTime();
     // inputZoom.value = newZoom; // Sync UI
 }, { passive: false });
 
@@ -219,15 +252,34 @@ function animate() {
     const time = clock.getElapsedTime();
     const delta = clock.getDelta();
 
-    // Inertia for rotation
-    if (!isDragging) {
+    // Determine Speed Multiplier
+    let speedMult = 1.0;
+    if (speedSlider) {
+        speedMult = parseFloat(speedSlider.value) / 10.0;
+    }
+
+    // Idle Animation Logic
+    const timeSinceInteraction = time - lastInteractionTime;
+    if (!isDragging && timeSinceInteraction > IDLE_THRESHOLD) {
+        // Smooth sine wave rotation (alternating directions)
+        // Period = 20s, Amplitude = low
+        const idleRotation = Math.sin(time * 0.3) * 0.002 * speedMult;
+        uniforms.uAngle.value += idleRotation;
+
+        // Breathing Zoom
+        // Base 1.0, varies +/- 0.1, slow period
+        const idleZoom = 1.0 + Math.sin(time * 0.5) * 0.1;
+        // Lerp current zoom towards idle zoom
+        uniforms.uZoom.value += (idleZoom - uniforms.uZoom.value) * 0.01;
+    } else if (!isDragging) {
+        // Normal Inertia
         // Decay velocity
         targetRotationVelocity *= 0.95;
-        uniforms.uAngle.value += targetRotationVelocity;
+        uniforms.uAngle.value += targetRotationVelocity * speedMult;
     }
 
     // Update Chamber (physics/movement)
-    chamber.update(time);
+    chamber.update(time, speedMult);
 
     // Render Chamber to Texture
     chamber.render();
@@ -236,7 +288,11 @@ function animate() {
     uniforms.uTime.value = time;
 
     // Render Main Scene
-    if (checkChamber.checked) {
+    if (checkChamber && checkChamber.checked) {
+        // Safety check for aspect ratio
+        if (chamber.debugCamera && Math.abs(chamber.debugCamera.aspect - (window.innerWidth / window.innerHeight)) > 0.01) {
+            chamber.resize(window.innerWidth, window.innerHeight);
+        }
         // Debug view: render chamber directly to screen
         renderer.render(chamber.scene, chamber.debugCamera);
     } else {

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { ArtisanObjects } from './ArtisanObjects.js?v=2';
 
 export class ObjectChamber {
-    constructor(renderer) {
+    constructor(renderer, width, height) {
         this.renderer = renderer;
         this.scene = new THREE.Scene();
         this.camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100); // Aspect ratio 1:1 for the texture
@@ -22,7 +22,9 @@ export class ObjectChamber {
         this.scene.add(this.group);
 
         // Debug Camera for "View Chamber" mode (matches screen aspect)
-        this.debugCamera = this.camera.clone();
+        const aspect = (width && height) ? width / height : 1.0;
+        this.debugCamera = new THREE.PerspectiveCamera(45, aspect, 0.1, 100);
+        this.debugCamera.position.z = 10;
 
 
         // --- Lighting & Environment ---
@@ -231,17 +233,17 @@ export class ObjectChamber {
         return mesh;
     }
 
-    update(time) {
+    update(time, speed = 1.0) {
         // Slowly rotate the entire group to simulate holding the scope
-        this.group.rotation.z = time * 0.1;
-        this.group.rotation.x = Math.sin(time * 0.2) * 0.2;
+        this.group.rotation.z = time * 0.1 * speed;
+        this.group.rotation.x = Math.sin(time * 0.2 * speed) * 0.2;
 
         // Animate individual objects (tumbling)
         this.objects.forEach(obj => {
-            obj.position.add(obj.userData.velocity);
-            obj.rotation.x += obj.userData.rotVelocity.x;
-            obj.rotation.y += obj.userData.rotVelocity.y;
-            obj.rotation.z += obj.userData.rotVelocity.z;
+            obj.position.add(obj.userData.velocity.clone().multiplyScalar(speed));
+            obj.rotation.x += obj.userData.rotVelocity.x * speed;
+            obj.rotation.y += obj.userData.rotVelocity.y * speed;
+            obj.rotation.z += obj.userData.rotVelocity.z * speed;
 
             // Simple bounds check to keep them in view
             if (obj.position.length() > 4.5) {

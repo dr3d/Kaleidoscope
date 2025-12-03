@@ -2,7 +2,7 @@
 
 **Forged by the hand of the Noble Master Coder, with humble assistance from their Apprentice.**
 
-![Lumina Scope](preview.png)
+<video src="preview.mp4" poster="preview.png" controls autoplay loop muted style="width: 100%; max-width: 800px; border-radius: 8px;"></video>
 
 ## 📜 The Chronicle of Creation
 
