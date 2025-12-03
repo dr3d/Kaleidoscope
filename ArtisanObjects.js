@@ -96,10 +96,12 @@ export const ArtisanObjects = {
             color: color || 0xffffff,
             metalness: 0.0,
             roughness: 0.0,
-            transmission: 0.95,
-            thickness: 1.5,
+            transmission: 1.0,
+            thickness: 2.0,
             ior: 1.5,
-            clearcoat: 1.0
+            clearcoat: 1.0,
+            attenuationColor: new THREE.Color(color),
+            attenuationDistance: 0.5
         });
 
         return new THREE.Mesh(geometry, material);
@@ -184,10 +186,14 @@ export const ArtisanObjects = {
         // Center the geometry
         geometry.center();
 
-        const material = new THREE.MeshStandardMaterial({
+        const material = new THREE.MeshPhysicalMaterial({
             color: color || 0xff00ff,
-            metalness: 0.5,
-            roughness: 0.2
+            metalness: 0.2,
+            roughness: 0.1,
+            transmission: 0.6, // Semi-transparent charms
+            thickness: 0.5,
+            ior: 1.4,
+            clearcoat: 1.0
         });
 
         const mesh = new THREE.Mesh(geometry, material);

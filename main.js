@@ -1,8 +1,11 @@
 import * as THREE from 'three';
 import { kaleidoscopeVertexShader, kaleidoscopeFragmentShader } from './kaleidoscopeShader.js';
-import { ObjectChamber } from './ObjectChamber.js';
+import { ObjectChamber } from './ObjectChamber.js?v=2';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
-// --- Initialization ---
 // --- Initialization ---
 const container = document.getElementById('canvas-container');
 if (!container) console.error('Canvas container not found!');
@@ -11,6 +14,7 @@ if (!container) console.error('Canvas container not found!');
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Cap pixel ratio for performance
+renderer.toneMapping = THREE.ReinhardToneMapping;
 container.appendChild(renderer.domElement);
 
 // Main Scene (for the quad)
@@ -39,6 +43,20 @@ const material = new THREE.ShaderMaterial({
 const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material);
 scene.add(quad);
 
+// --- Post-Processing ---
+const composer = new EffectComposer(renderer);
+const renderPass = new RenderPass(scene, camera);
+composer.addPass(renderPass);
+
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
+bloomPass.threshold = 0.2;
+bloomPass.strength = 0.8; // Glow strength
+bloomPass.radius = 0.5;
+composer.addPass(bloomPass);
+
+const outputPass = new OutputPass();
+composer.addPass(outputPass);
+
 // --- Interaction State ---
 let isDragging = false;
 let lastMouseX = 0;
@@ -49,11 +67,13 @@ let targetRotationVelocity = 0;
 // --- UI Controls ---
 const btnBuild = document.getElementById('btn-build');
 const inputSegments = document.getElementById('input-segments');
-// const inputZoom = document.getElementById('input-zoom'); // Removed
 const inputCount = document.getElementById('input-count');
 const groupMirrors = document.getElementById('group-mirrors');
 const groupCount = document.getElementById('group-count');
 const checkChamber = document.getElementById('check-chamber');
+const valueSegments = document.getElementById('value-segments');
+const valueCount = document.getElementById('value-count');
+const instructions = document.querySelector('.instructions');
 
 btnBuild.addEventListener('click', () => {
     // Pass current count value if in chamber mode, else undefined (random)
@@ -63,12 +83,14 @@ btnBuild.addEventListener('click', () => {
 
 inputSegments.addEventListener('input', (e) => {
     uniforms.uSegments.value = parseFloat(e.target.value);
+    valueSegments.innerText = e.target.value;
 });
 
 // Debounce buildNew for performance
 let buildTimeout;
 inputCount.addEventListener('input', (e) => {
     const count = parseInt(e.target.value);
+    valueCount.innerText = count;
     clearTimeout(buildTimeout);
     buildTimeout = setTimeout(() => {
         chamber.buildNew(count);
@@ -80,16 +102,19 @@ checkChamber.addEventListener('change', (e) => {
         // Show Item Count, Hide Mirrors
         groupMirrors.style.display = 'none';
         groupCount.style.display = 'flex';
+        instructions.style.display = 'none';
     } else {
         // Show Mirrors, Hide Item Count
         groupMirrors.style.display = 'flex';
         groupCount.style.display = 'none';
+        instructions.style.display = 'block';
     }
 });
 
 // --- Input Handling ---
 window.addEventListener('resize', () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
+    composer.setSize(window.innerWidth, window.innerHeight);
     uniforms.uResolution.value.set(window.innerWidth, window.innerHeight);
 });
 
@@ -103,8 +128,10 @@ const onStart = (x, y) => {
 
 const onMove = (x, y) => {
     // Background Color Logic (Mouse Y)
+    // Map Y to Hue (0-1) and Intensity (0.5 - 2.0)
     const hue = y / window.innerHeight;
-    chamber.setBackgroundHue(hue);
+    const intensity = 0.5 + (1.0 - (y / window.innerHeight)) * 1.5; // Top is brighter
+    chamber.updateEnvironment(hue, intensity);
 
     if (!isDragging) return;
     const deltaX = x - lastMouseX;
@@ -146,7 +173,7 @@ container.addEventListener('wheel', (e) => {
     let newZoom = uniforms.uZoom.value + e.deltaY * -zoomSpeed;
     newZoom = Math.max(0.5, Math.min(3.0, newZoom));
     uniforms.uZoom.value = newZoom;
-    inputZoom.value = newZoom; // Sync UI
+    // inputZoom.value = newZoom; // Sync UI
 }, { passive: false });
 
 
@@ -208,8 +235,8 @@ function animate() {
         // Debug view: render chamber directly to screen
         renderer.render(chamber.scene, chamber.camera);
     } else {
-        // Kaleidoscope view
-        renderer.render(scene, camera);
+        // Kaleidoscope view with Bloom
+        composer.render();
     }
 }
 

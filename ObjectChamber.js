@@ -19,22 +19,60 @@ export class ObjectChamber {
         this.group = new THREE.Group();
         this.scene.add(this.group);
 
-        // Lighting
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-        this.scene.add(ambientLight);
+        // --- Lighting & Environment ---
 
-        const dirLight = new THREE.DirectionalLight(0xffffff, 2.0);
-        dirLight.position.set(5, 10, 7);
-        this.scene.add(dirLight);
+        // 1. Backlight (The "Sun" at the end of the tube)
+        // A strong light source positioned behind the objects
+        this.backlight = new THREE.PointLight(0xffffff, 5.0, 20);
+        this.backlight.position.set(0, 0, -5); // Behind objects
+        this.scene.add(this.backlight);
 
-        const pointLight = new THREE.PointLight(0xffaa00, 1.0, 20);
-        pointLight.position.set(-5, -5, 5);
-        this.scene.add(pointLight);
+        // 2. Rim/Fill Lights
+        const rimLight = new THREE.SpotLight(0xffaa00, 5.0);
+        rimLight.position.set(5, 5, 5);
+        rimLight.lookAt(0, 0, 0);
+        this.scene.add(rimLight);
+
+        const fillLight = new THREE.AmbientLight(0x404040, 2.0); // Higher ambient for glass
+        this.scene.add(fillLight);
+
+        // 3. Procedural HDR Environment
+        this.pmremGenerator = new THREE.PMREMGenerator(this.renderer);
+        this.pmremGenerator.compileEquirectangularShader();
 
         // Background - maybe a gradient or textured plane
         this.scene.background = new THREE.Color(0x101010);
 
+        this.updateEnvironment();
         this.buildNew();
+    }
+
+    updateEnvironment(hue = 0.5, intensity = 1.0) {
+        // Create a simple scene to render as env map
+        const envScene = new THREE.Scene();
+        envScene.background = new THREE.Color().setHSL(hue, 0.6, 0.1 * intensity);
+
+        // Add some bright "lights" (meshes) to the env scene to create reflections
+        const geometry = new THREE.IcosahedronGeometry(1, 1);
+        const material = new THREE.MeshBasicMaterial({ color: new THREE.Color().setHSL(hue + 0.3, 1.0, 0.8 * intensity) });
+
+        for (let i = 0; i < 10; i++) {
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.position.set(
+                (Math.random() - 0.5) * 20,
+                (Math.random() - 0.5) * 20,
+                (Math.random() - 0.5) * 20
+            );
+            envScene.add(mesh);
+        }
+
+        const envMap = this.pmremGenerator.fromScene(envScene).texture;
+        this.scene.environment = envMap;
+        this.scene.background = new THREE.Color().setHSL(hue, 0.4, 0.02 * intensity); // Darker background for contrast
+
+        // Update backlight color too
+        this.backlight.color.setHSL(hue, 0.5, 0.9);
+        this.backlight.intensity = 5.0 * intensity;
     }
 
     buildNew(count) {
@@ -44,9 +82,9 @@ export class ObjectChamber {
         }
         this.objects = [];
 
-        // Randomize Background
-        const hue = Math.random();
-        this.scene.background = new THREE.Color().setHSL(hue, 0.3, 0.05);
+        // Randomize Background (handled by updateEnvironment now, but we can tweak it)
+        // const hue = Math.random();
+        // this.updateEnvironment(hue);
 
         // Create new objects
         const numObjects = count || (30 + Math.floor(Math.random() * 30));
@@ -112,21 +150,24 @@ export class ObjectChamber {
                 let material;
                 const matType = Math.random();
 
-                if (matType < 0.6) { // Glass / Gem
+                if (matType < 0.7) { // Glass / Gem (Increased probability)
                     material = new THREE.MeshPhysicalMaterial({
                         color: color,
-                        metalness: 0.0,
-                        roughness: 0.1,
-                        transmission: 0.9, // Glass-like
-                        thickness: 1.0,
-                        ior: 1.5 + Math.random() * 0.5, // Refractive index
-                        clearcoat: 1.0
+                        metalness: 0.1,
+                        roughness: 0.05,
+                        transmission: 0.95, // High transmission for glass
+                        thickness: 1.5, // Refraction volume
+                        ior: 1.5 + Math.random() * 0.5,
+                        clearcoat: 1.0,
+                        attenuationColor: color,
+                        attenuationDistance: 1.0
                     });
-                } else if (matType < 0.8) { // Metallic
+                } else if (matType < 0.9) { // Metallic
                     material = new THREE.MeshStandardMaterial({
                         color: color,
-                        metalness: 0.9,
-                        roughness: 0.2
+                        metalness: 1.0,
+                        roughness: 0.2,
+                        envMapIntensity: 1.0
                     });
                 } else { // Matte / Plastic
                     material = new THREE.MeshStandardMaterial({
@@ -202,6 +243,7 @@ export class ObjectChamber {
     }
 
     setBackgroundHue(hue) {
-        this.scene.background.setHSL(hue, 0.3, 0.05);
+        // Legacy support - redirect to updateEnvironment
+        this.updateEnvironment(hue);
     }
 }
