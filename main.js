@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { kaleidoscopeVertexShader, kaleidoscopeFragmentShader } from './kaleidoscopeShader.js';
-import { ObjectChamber } from './ObjectChamber.js?v=4';
+import { ObjectChamber } from './ObjectChamber.js?v=5';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -23,6 +23,7 @@ const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
 // Object Chamber (The Source)
 const chamber = new ObjectChamber(renderer);
+chamber.resize(window.innerWidth, window.innerHeight);
 
 // Shader Material
 const uniforms = {
