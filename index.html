@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Artisan Kaleidoscope</title>
+    <link rel="stylesheet" href="style.css?v=2">
+    <script>
+        window.onerror = function (msg, url, line, col, error) {
+            console.error('Global Error:', msg, url, line, col, error);
+            // Also show on screen for debugging
+            const errDiv = document.createElement('div');
+            errDiv.style.position = 'fixed';
+            errDiv.style.top = '0';
+            errDiv.style.left = '0';
+            errDiv.style.background = 'red';
+            errDiv.style.color = 'white';
+            errDiv.style.zIndex = '9999';
+            errDiv.innerText = 'Error: ' + msg;
+            document.body.appendChild(errDiv);
+        };
+    </script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+
+<body>
+    <div id="canvas-container"></div>
+
+    <div id="ui-layer">
+        <div class="header">
+            <h1>Lumina Scope</h1>
+            <p>Artisan Digital Kaleidoscope</p>
+        </div>
+
+        <div class="controls ui-fade">
+            <button id="btn-build" class="btn-primary">
+                <span class="icon">✨</span> Build New Scope
+            </button>
+
+            <div id="group-mirrors" class="control-group">
+                <label>Mirrors</label>
+                <input type="range" id="input-segments" min="4" max="16" step="1" value="8">
+            </div>
+
+            <div id="group-count" class="control-group" style="display: none;">
+                <label>Items</label>
+                <input type="range" id="input-count" min="10" max="100" step="1" value="50">
+            </div>
+
+            <!-- Zoom Removed -->
+
+            <div class="toggle-group">
+                <label class="switch">
+                    <input type="checkbox" id="check-chamber">
+                    <span class="slider round"></span>
+                </label>
+                <span>View Chamber</span>
+            </div>
+        </div>
+
+        <div class="instructions ui-fade">
+            Drag to Rotate and Color
+        </div>
+    </div>
+
+    <script type="module" src="main.js?v=2"></script>
+</body>
+
+</html>
