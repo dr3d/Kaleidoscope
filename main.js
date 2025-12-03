@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { kaleidoscopeVertexShader, kaleidoscopeFragmentShader } from './kaleidoscopeShader.js';
-import { ObjectChamber } from './ObjectChamber.js?v=2';
+import { ObjectChamber } from './ObjectChamber.js?v=4';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -180,10 +180,14 @@ container.addEventListener('wheel', (e) => {
 // --- UI Inactivity Fade ---
 let inactivityTimer;
 const uiElements = document.querySelectorAll('.ui-fade');
+const urlParams = new URLSearchParams(window.location.search);
+const uiDebug = urlParams.has('ui_debug');
 
 function resetInactivityTimer() {
     // Show UI
     uiElements.forEach(el => el.classList.remove('ui-hidden'));
+
+    if (uiDebug) return; // Keep UI always visible in debug mode
 
     // Clear existing timer
     clearTimeout(inactivityTimer);

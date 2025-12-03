@@ -146,9 +146,6 @@ export const ArtisanObjects = {
             shape.bezierCurveTo(x + 0.60, y + 0.77, x + 0.80, y + 0.55, x + 0.80, y + 0.35);
             shape.bezierCurveTo(x + 0.80, y + 0.35, x + 0.80, y, x + 0.50, y);
             shape.bezierCurveTo(x + 0.35, y, x + 0.25, y + 0.25, x + 0.25, y + 0.25);
-            // Center it roughly
-            const positions = shape.getPoints();
-            // (Simplification: just shift it down a bit)
         } else if (type === 'lightning') {
             shape.moveTo(-0.1, 0.5);
             shape.lineTo(0.1, 0.1);
@@ -199,5 +196,78 @@ export const ArtisanObjects = {
         const mesh = new THREE.Mesh(geometry, material);
         mesh.scale.set(scale, scale, scale);
         return mesh;
+    },
+
+    createFruit: (type, scale = 1) => {
+        const group = new THREE.Group();
+
+        if (type === 'cherry') {
+            // Cherry Body
+            const bodyGeom = new THREE.SphereGeometry(0.2 * scale, 16, 16);
+            const bodyMat = new THREE.MeshPhysicalMaterial({
+                color: 0xcc0000,
+                roughness: 0.1,
+                transmission: 0.2,
+                clearcoat: 1.0
+            });
+            const body = new THREE.Mesh(bodyGeom, bodyMat);
+            group.add(body);
+
+            // Stem
+            const stemPath = new THREE.CatmullRomCurve3([
+                new THREE.Vector3(0, 0.15 * scale, 0),
+                new THREE.Vector3(0.05 * scale, 0.3 * scale, 0),
+                new THREE.Vector3(0.1 * scale, 0.4 * scale, 0)
+            ]);
+            const stemGeom = new THREE.TubeGeometry(stemPath, 8, 0.02 * scale, 4, false);
+            const stemMat = new THREE.MeshStandardMaterial({ color: 0x00aa00, roughness: 0.8 });
+            const stem = new THREE.Mesh(stemGeom, stemMat);
+            group.add(stem);
+        } else if (type === 'grape') {
+            // Cluster of small spheres
+            const grapeGeom = new THREE.SphereGeometry(0.08 * scale, 8, 8);
+            const grapeMat = new THREE.MeshPhysicalMaterial({
+                color: 0x663399,
+                roughness: 0.2,
+                transmission: 0.6,
+                thickness: 0.5
+            });
+
+            for (let i = 0; i < 8; i++) {
+                const grape = new THREE.Mesh(grapeGeom, grapeMat);
+                grape.position.set(
+                    (Math.random() - 0.5) * 0.2 * scale,
+                    (Math.random() - 0.5) * 0.2 * scale - (i * 0.05 * scale),
+                    (Math.random() - 0.5) * 0.2 * scale
+                );
+                group.add(grape);
+            }
+        }
+        return group;
+    },
+
+    createColoredSpring: (scale = 1, color) => {
+        // Same as createSpring but accepts color
+        const path = new HelixCurve(scale, 8);
+        const geometry = new THREE.TubeGeometry(path, 64, 0.05 * scale, 8, false);
+        const material = new THREE.MeshStandardMaterial({
+            color: color || 0xaaaaaa,
+            metalness: 0.9,
+            roughness: 0.3
+        });
+        return new THREE.Mesh(geometry, material);
+    },
+
+    createBead: (scale = 1, color) => {
+        // Simple Torus or Sphere with hole
+        const geometry = new THREE.TorusGeometry(0.15 * scale, 0.08 * scale, 12, 24);
+        const material = new THREE.MeshPhysicalMaterial({
+            color: color || 0x00ffff,
+            roughness: 0.1,
+            transmission: 0.8,
+            thickness: 0.5,
+            clearcoat: 1.0
+        });
+        return new THREE.Mesh(geometry, material);
     }
 };
