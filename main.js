@@ -238,7 +238,7 @@ function animate() {
     // Render Main Scene
     if (checkChamber.checked) {
         // Debug view: render chamber directly to screen
-        renderer.render(chamber.scene, chamber.camera);
+        renderer.render(chamber.scene, chamber.debugCamera);
     } else {
         // Kaleidoscope view with Bloom
         composer.render();
