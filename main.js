@@ -65,7 +65,10 @@ let lastMouseY = 0;
 let rotationVelocity = 0; // For inertia
 let targetRotationVelocity = 0;
 let lastInteractionTime = 0;
-const IDLE_THRESHOLD = 30.0; // Seconds
+const IDLE_THRESHOLD = window.IDLE_THRESHOLD_OVERRIDE || 30.0; // Seconds
+
+// Expose for debugging
+window.chamber = chamber;
 
 // --- UI Controls ---
 let btnBuild, inputSegments, inputCount, groupMirrors, groupCount, checkChamber, valueSegments, valueCount, instructions, speedSlider, valueSpeed;
@@ -220,6 +223,7 @@ const uiDebug = urlParams.has('ui_debug');
 function resetInactivityTimer() {
     // Show UI
     uiElements.forEach(el => el.classList.remove('ui-hidden'));
+    document.body.classList.remove('cursor-hidden');
 
     if (uiDebug) return; // Keep UI always visible in debug mode
 
@@ -229,6 +233,7 @@ function resetInactivityTimer() {
     // Set new timer for 5 seconds
     inactivityTimer = setTimeout(() => {
         uiElements.forEach(el => el.classList.add('ui-hidden'));
+        document.body.classList.add('cursor-hidden');
     }, 5000);
 }
 
@@ -271,6 +276,26 @@ function animate() {
         const idleZoom = 1.0 + Math.sin(time * 0.5) * 0.1;
         // Lerp current zoom towards idle zoom
         uniforms.uZoom.value += (idleZoom - uniforms.uZoom.value) * 0.01;
+
+        // Animate Background Hue
+        // Cycle roughly every 60 seconds
+        const idleHue = (time * 0.05) % 1.0;
+        chamber.updateEnvironment(idleHue, 1.0); // Maintain high intensity
+
+        // Dynamic Content Swapping
+        // Every 2 seconds (approx), swap 1-2 objects
+        if (Math.floor(time * 0.5) > Math.floor((time - delta) * 0.5)) {
+            const swapCount = 1 + Math.floor(Math.random() * 2);
+            const themes = ['christmas', 'halloween', 'industrial', 'fruity', 'gemstone'];
+            const randomTheme = themes[Math.floor(Math.random() * themes.length)];
+
+            if (chamber.objects.length < 100) {
+                chamber.swapObjects(swapCount, randomTheme);
+            } else {
+                chamber.removeRandomObject();
+            }
+        }
+
     } else if (!isDragging) {
         // Normal Inertia
         // Decay velocity

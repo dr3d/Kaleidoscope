@@ -179,12 +179,14 @@ export class ObjectChamber {
             const palette = [0xff6600, 0x000000, 0x663399, 0x00ff00];
             return new THREE.Color(palette[Math.floor(Math.random() * palette.length)]);
         } else if (theme === 'industrial') {
-            const palette = [0xc0c0c0, 0x808080, 0xb87333, 0x333333];
+            // Even industrial can be a bit more vibrant? Keeping it metallic for now but adding a rust orange
+            const palette = [0xc0c0c0, 0x808080, 0xb87333, 0x333333, 0xff4500];
             return new THREE.Color(palette[Math.floor(Math.random() * palette.length)]);
         } else if (theme === 'fruity') {
-            return new THREE.Color().setHSL(Math.random(), 1.0, 0.6); // Vibrant
+            // Super vibrant fruits
+            return new THREE.Color().setHSL(Math.random(), 1.0, 0.6);
         } else {
-            // Gemstone - random rich colors
+            // Gemstone / Default - Max saturation
             return new THREE.Color().setHSL(Math.random(), 1.0, 0.5);
         }
     }
@@ -272,6 +274,105 @@ export class ObjectChamber {
         if (this.debugCamera) {
             this.debugCamera.aspect = width / height;
             this.debugCamera.updateProjectionMatrix();
+        }
+    }
+
+    addRandomObject(theme = 'gemstone') {
+        let mesh;
+        const scale = 0.3 + Math.random() * 1.2;
+        let color = this.getThemeColor(theme);
+
+        // Select Object Type based on Theme
+        const type = Math.random();
+
+        if (theme === 'christmas') {
+            if (type < 0.2) mesh = ArtisanObjects.createCharm('star', scale, new THREE.Color(0xffd700));
+            else if (type < 0.4) mesh = ArtisanObjects.createTwistedRod(scale * 1.5, new THREE.Color(0xff0000));
+            else if (type < 0.6) mesh = ArtisanObjects.createBead(scale, new THREE.Color(0x00ff00));
+            else mesh = this.createStandardGem(scale, color);
+        }
+        else if (theme === 'halloween') {
+            if (type < 0.2) mesh = ArtisanObjects.createCharm('moon', scale, new THREE.Color(0xffff00));
+            else if (type < 0.4) mesh = ArtisanObjects.createCharm('cloud', scale, new THREE.Color(0x555555));
+            else if (type < 0.6) mesh = ArtisanObjects.createTwistedRod(scale, new THREE.Color(0xff6600));
+            else mesh = this.createStandardGem(scale, color);
+        }
+        else if (theme === 'industrial') {
+            if (type < 0.3) mesh = ArtisanObjects.createScrew(scale, new THREE.Color(0xb87333));
+            else if (type < 0.6) mesh = ArtisanObjects.createColoredSpring(scale, new THREE.Color(0xc0c0c0));
+            else if (type < 0.8) mesh = ArtisanObjects.createCharm('lightning', scale, new THREE.Color(0xffff00));
+            else mesh = this.createStandardGem(scale, color);
+        }
+        else if (theme === 'fruity') {
+            if (type < 0.3) mesh = ArtisanObjects.createFruit('cherry', scale);
+            else if (type < 0.6) mesh = ArtisanObjects.createFruit('grape', scale);
+            else if (type < 0.8) mesh = ArtisanObjects.createBead(scale, color);
+            else mesh = this.createStandardGem(scale, color);
+        }
+        else { // Gemstone / Default
+            if (type < 0.1) mesh = ArtisanObjects.createCharm('diamond', scale, color);
+            else if (type < 0.3) mesh = ArtisanObjects.createTwistedRod(scale, color);
+            else mesh = this.createStandardGem(scale, color);
+        }
+
+        if (!mesh) mesh = this.createStandardGem(scale, color);
+
+        // Random position (spawn near center but slightly offset)
+        mesh.position.set(
+            (Math.random() - 0.5) * 4,
+            (Math.random() - 0.5) * 4,
+            (Math.random() - 0.5) * 2
+        );
+
+        // Random rotation
+        mesh.rotation.set(
+            Math.random() * Math.PI,
+            Math.random() * Math.PI,
+            Math.random() * Math.PI
+        );
+
+        // Store velocity
+        mesh.userData = {
+            velocity: new THREE.Vector3(
+                (Math.random() - 0.5) * 0.02,
+                (Math.random() - 0.5) * 0.02,
+                (Math.random() - 0.5) * 0.02
+            ),
+            rotVelocity: new THREE.Vector3(
+                (Math.random() - 0.5) * 0.05,
+                (Math.random() - 0.5) * 0.05,
+                (Math.random() - 0.5) * 0.05
+            )
+        };
+
+        this.group.add(mesh);
+        this.objects.push(mesh);
+    }
+
+    removeRandomObject() {
+        if (this.objects.length === 0) return;
+        const index = Math.floor(Math.random() * this.objects.length);
+        const objectToRemove = this.objects[index];
+
+        // Remove from scene and array
+        this.group.remove(objectToRemove);
+        this.objects.splice(index, 1);
+
+        // Dispose geometry and material to prevent leaks
+        if (objectToRemove.geometry) objectToRemove.geometry.dispose();
+        if (objectToRemove.material) {
+            if (Array.isArray(objectToRemove.material)) {
+                objectToRemove.material.forEach(m => m.dispose());
+            } else {
+                objectToRemove.material.dispose();
+            }
+        }
+    }
+
+    swapObjects(count = 1, theme = 'gemstone') {
+        for (let i = 0; i < count; i++) {
+            if (this.objects.length > 0) this.removeRandomObject();
+            this.addRandomObject(theme);
         }
     }
 }
