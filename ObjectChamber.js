@@ -91,7 +91,8 @@ export class ObjectChamber {
 
         // Select a Theme
         const themes = ['christmas', 'halloween', 'industrial', 'fruity', 'gemstone'];
-        const theme = themes[Math.floor(Math.random() * themes.length)];
+        this.currentTheme = themes[Math.floor(Math.random() * themes.length)]; // Store on instance
+        const theme = this.currentTheme;
         console.log('Selected Theme:', theme);
 
         // Create new objects
@@ -235,10 +236,57 @@ export class ObjectChamber {
         return mesh;
     }
 
+    setAudio(audio) {
+        this.audio = audio;
+    }
+
     update(time, speed = 1.0) {
         // Slowly rotate the entire group to simulate holding the scope
         this.group.rotation.z = time * 0.1 * speed;
         this.group.rotation.x = Math.sin(time * 0.2 * speed) * 0.2;
+
+        const objects = this.objects;
+        const count = objects.length;
+
+        // Collision Detection (Naive O(N^2) - OK for N < 100)
+        for (let i = 0; i < count; i++) {
+            const objA = objects[i];
+            const radiusA = objA.scale.x * 0.5; // Approx radius
+
+            for (let j = i + 1; j < count; j++) {
+                const objB = objects[j];
+                const radiusB = objB.scale.x * 0.5;
+
+                const distSq = objA.position.distanceToSquared(objB.position);
+                const minSeparation = radiusA + radiusB;
+
+                if (distSq < minSeparation * minSeparation) {
+                    // Collision!
+
+                    // Simple elastic bounce response
+                    // Separate them slightly to prevents sticking
+                    const dir = new THREE.Vector3().subVectors(objA.position, objB.position).normalize();
+                    const push = dir.multiplyScalar(0.01);
+                    objA.position.add(push);
+                    objB.position.sub(push);
+
+                    // Swap velocities approx (or reflect)
+                    const temp = objA.userData.velocity.clone();
+                    objA.userData.velocity.lerp(objB.userData.velocity, 0.8); // Transfer momentum
+                    objB.userData.velocity.lerp(temp, 0.8);
+
+                    // Audio Trigger
+                    // Calculate relative velocity for impact intensity
+                    if (this.audio) {
+                        const relVel = new THREE.Vector3().subVectors(objA.userData.velocity, objB.userData.velocity).length();
+                        // Only trigger if impact is significant enough
+                        if (relVel > 0.005) {
+                            this.audio.triggerCollisionSound(relVel);
+                        }
+                    }
+                }
+            }
+        }
 
         // Animate individual objects (tumbling)
         this.objects.forEach(obj => {

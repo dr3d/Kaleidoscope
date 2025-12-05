@@ -70,11 +70,21 @@ const IDLE_THRESHOLD = window.IDLE_THRESHOLD_OVERRIDE || 30.0; // Seconds
 // Expose for debugging
 window.chamber = chamber;
 
+// --- Audio Engine ---
+import { KaleidoscopeAudio } from './KaleidoscopeAudio.js';
+const audio = new KaleidoscopeAudio();
+let btnAudio;
+
+// Connect Collision Audio
+chamber.setAudio(audio);
+
+
 // --- UI Controls ---
 let btnBuild, inputSegments, inputCount, groupMirrors, groupCount, checkChamber, valueSegments, valueCount, instructions, speedSlider, valueSpeed;
 
 document.addEventListener('DOMContentLoaded', () => {
     btnBuild = document.getElementById('btn-build');
+    // ... existing ...
     inputSegments = document.getElementById('input-segments');
     inputCount = document.getElementById('input-count');
     groupMirrors = document.getElementById('group-mirrors');
@@ -85,6 +95,22 @@ document.addEventListener('DOMContentLoaded', () => {
     instructions = document.querySelector('.instructions');
     speedSlider = document.getElementById('speedSlider');
     valueSpeed = document.getElementById('value-speed');
+
+    btnAudio = document.getElementById('btn-audio');
+    if (btnAudio) {
+        btnAudio.addEventListener('click', async () => {
+            if (!audio.isPlaying) {
+                await audio.init();
+                audio.start();
+                btnAudio.innerHTML = '<span class="icon">🔇</span> Stop Audio';
+                btnAudio.classList.add('active');
+            } else {
+                audio.stop();
+                btnAudio.innerHTML = '<span class="icon">🔊</span> Start Audio';
+                btnAudio.classList.remove('active');
+            }
+        });
+    }
 
     if (btnBuild) {
         btnBuild.addEventListener('click', () => {
@@ -157,6 +183,9 @@ const onStart = (x, y) => {
     lastMouseY = y;
     targetRotationVelocity = 0;
     lastInteractionTime = clock.getElapsedTime();
+
+    // Audio feedback?
+    // audio.triggerInteractionSound(); // Future
 };
 
 const onMove = (x, y) => {
@@ -167,6 +196,11 @@ const onMove = (x, y) => {
     chamber.updateEnvironment(hue, intensity);
 
     lastInteractionTime = clock.getElapsedTime();
+
+    // Reset major idle timer on interaction
+    if (window.lastMajorIdleTime) {
+        window.lastMajorIdleTime = lastInteractionTime;
+    }
 
     if (!isDragging) return;
     const deltaX = x - lastMouseX;
@@ -218,7 +252,7 @@ container.addEventListener('wheel', (e) => {
 let inactivityTimer;
 const uiElements = document.querySelectorAll('.ui-fade');
 const urlParams = new URLSearchParams(window.location.search);
-const uiDebug = urlParams.has('ui_debug');
+const uiDebug = urlParams.get('ui_debug') === 'true';
 
 function resetInactivityTimer() {
     // Show UI
@@ -263,13 +297,47 @@ function animate() {
         speedMult = parseFloat(speedSlider.value) / 10.0;
     }
 
+    // Update Audio
+    if (audio.isPlaying) {
+        audio.updateParams(speedMult, chamber.currentTheme);
+    }
+
     // Idle Animation Logic
     const timeSinceInteraction = time - lastInteractionTime;
     if (!isDragging && timeSinceInteraction > IDLE_THRESHOLD) {
-        // Smooth sine wave rotation (alternating directions)
-        // Period = 20s, Amplitude = low
-        const idleRotation = Math.sin(time * 0.3) * 0.002 * speedMult;
-        uniforms.uAngle.value += idleRotation;
+        // Procedural "Wandering" Rotation
+        // State: Move in a direction, slow down, stop, maybe reverse.
+
+        // Randomly change "target" idle velocity every few seconds
+        // Use a noise-like function or simple probability
+        if (!window.idleNextStateTime || time > window.idleNextStateTime) {
+            // Pick next state duration (2 to 7 seconds)
+            window.idleNextStateTime = time + 2.0 + Math.random() * 5.0;
+
+            // Pick next target velocity
+            const chance = Math.random();
+            if (chance < 0.3) {
+                // Stop/Pause (30% chance)
+                window.idleTargetVelocity = 0;
+            } else {
+                // Move (70% chance)
+                // Random direction (+/- 1)
+                const dir = Math.random() > 0.5 ? 1 : -1;
+                // Random slow speed (0.0005 to 0.003)
+                const magnitude = 0.0005 + Math.random() * 0.0025;
+                window.idleTargetVelocity = dir * magnitude;
+            }
+        }
+
+        // Initialize if undefined
+        if (window.idleCurrentVelocity === undefined) window.idleCurrentVelocity = 0;
+
+        // Smoothly lerp current velocity to target (Heavy damping for "easy does it")
+        // Lerp factor 0.02 is very slow smoothing
+        window.idleCurrentVelocity += (window.idleTargetVelocity - window.idleCurrentVelocity) * 0.01;
+
+        // Apply
+        uniforms.uAngle.value += window.idleCurrentVelocity * speedMult;
 
         // Breathing Zoom
         // Base 1.0, varies +/- 0.1, slow period
@@ -294,6 +362,29 @@ function animate() {
             } else {
                 chamber.removeRandomObject();
             }
+        }
+
+        // --- Major Idle Reset (User Request) ---
+        // Every 30 to 120 seconds, rebuild scope and reset audio
+        if (!window.lastMajorIdleTime) {
+            window.lastMajorIdleTime = time;
+            window.nextMajorIdleInterval = 30 + Math.random() * 90;
+        }
+
+        if (time - window.lastMajorIdleTime > window.nextMajorIdleInterval) {
+            console.log("Triggering Major Idle Reset");
+
+            // 1. Rebuild Scope
+            chamber.buildNew();
+
+            // 2. Reset Audio (Fade & Restart)
+            if (audio && audio.isInitialized) {
+                audio.performTextureReset();
+            }
+
+            // 3. Reset Timer
+            window.lastMajorIdleTime = time;
+            window.nextMajorIdleInterval = 30 + Math.random() * 90; // new random interval
         }
 
     } else if (!isDragging) {

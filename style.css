@@ -1,12 +1,14 @@
 :root {
     --bg-color: #050505;
     --text-color: #ffffff;
-    --accent-color: #d4af37; /* Gold */
+    --accent-color: #d4af37;
+    /* Gold */
     --panel-bg: rgba(20, 20, 20, 0.6);
     --font-main: 'Inter', sans-serif;
 }
 
-body, html {
+body,
+html {
     margin: 0;
     padding: 0;
     width: 100%;
@@ -33,7 +35,8 @@ body, html {
     width: 100%;
     height: 100%;
     z-index: 2;
-    pointer-events: none; /* Let clicks pass through to canvas */
+    pointer-events: none;
+    /* Let clicks pass through to canvas */
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -43,7 +46,7 @@ body, html {
 
 .header {
     text-align: center;
-    text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
     pointer-events: auto;
 }
 
@@ -69,12 +72,12 @@ body, html {
     backdrop-filter: blur(10px);
     padding: 1.5rem;
     border-radius: 16px;
-    border: 1px solid rgba(255,255,255,0.1);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     gap: 2rem;
     align-items: center;
     pointer-events: auto;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
     transition: opacity 0.3s;
 }
 
@@ -124,7 +127,7 @@ input[type="range"] {
     -webkit-appearance: none;
     width: 100px;
     height: 4px;
-    background: rgba(255,255,255,0.2);
+    background: rgba(255, 255, 255, 0.2);
     border-radius: 2px;
     outline: none;
 }
@@ -167,7 +170,7 @@ input[type="range"]::-webkit-slider-thumb {
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: rgba(255,255,255,0.2);
+    background-color: rgba(255, 255, 255, 0.2);
     transition: .4s;
 }
 
@@ -182,11 +185,11 @@ input[type="range"]::-webkit-slider-thumb {
     transition: .4s;
 }
 
-input:checked + .slider {
+input:checked+.slider {
     background-color: var(--accent-color);
 }
 
-input:checked + .slider:before {
+input:checked+.slider:before {
     transform: translateX(20px);
 }
 
@@ -216,4 +219,3 @@ input:checked + .slider:before {
     opacity: 0;
     pointer-events: none;
 }
-
