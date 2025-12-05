@@ -71,6 +71,10 @@ export class KaleidoscopeAudio {
         this.dist = new Tone.Distortion(0.0).connect(limiter);
         this.chorus = new Tone.Chorus(2.5, 3.5, 0.7).connect(this.reverb).start();
 
+        // --- Analysis ---
+        this.meter = new Tone.Meter({ smoothing: 0.8 });
+        this.masterFilter.connect(this.meter); // Connect master output to meter
+
         // --- Instruments ---
 
         // 1. Kick
@@ -85,6 +89,8 @@ export class KaleidoscopeAudio {
                 release: 1.4,
             }
         }).connect(limiter);
+        // Boost Kick
+        this.kick.volume.value = 0;
 
         // 2. Snare
         this.snare = new Tone.NoiseSynth({
@@ -109,7 +115,7 @@ export class KaleidoscopeAudio {
             resonance: 4000,
             octaves: 1.5
         }).connect(this.reverb);
-        this.crash.volume.value = -3;
+        this.crash.volume.value = -6; // Boosted from -10
 
         // 4. HiHat
         this.hihat = new Tone.MetalSynth({
@@ -124,7 +130,7 @@ export class KaleidoscopeAudio {
             resonance: 4000,
             octaves: 1.5
         }).connect(this.reverb);
-        this.hihat.volume.value = -12;
+        this.hihat.volume.value = -8; // Boosted from -12
 
         // 5. Bass
         this.bass = new Tone.MonoSynth({
@@ -144,7 +150,7 @@ export class KaleidoscopeAudio {
                 octaves: 2.5
             }
         }).connect(this.dist);
-        this.bass.volume.value = -6;
+        this.bass.volume.value = -3; // Boosted from -6
 
         // 6. Lead (Soft)
         this.poly = new Tone.PolySynth(Tone.Synth, {
@@ -160,7 +166,7 @@ export class KaleidoscopeAudio {
                 release: 1.5
             }
         }).connect(this.delay);
-        this.poly.volume.value = -10;
+        this.poly.volume.value = -8; // Slight boost
 
         // 7. AggroLead (New) - For Algorave
         this.aggroLead = new Tone.MonoSynth({
@@ -179,8 +185,8 @@ export class KaleidoscopeAudio {
                 baseFrequency: 500,
                 octaves: 4
             }
-        }).connect(this.dist); // Through distortion
-        this.aggroLead.volume.value = -8;
+        }).connect(this.dist);
+        this.aggroLead.volume.value = -6;
 
         // 8. Glass
         this.glass = new Tone.PolySynth(Tone.Synth, {
@@ -192,7 +198,7 @@ export class KaleidoscopeAudio {
                 release: 2
             }
         }).connect(this.delay);
-        this.glass.volume.value = -3;
+        this.glass.volume.value = -2; // Boosted for collisions
 
         // 9. Choir
         this.choir = new Tone.PolySynth(Tone.Synth, {
@@ -214,12 +220,16 @@ export class KaleidoscopeAudio {
         // Kick Logic
         this.kickLoop = new Tone.Loop(time => {
             if (this.beatMode === 'choral' || this.beatMode === 'tumbling') return;
-            if (this.intensity < 0.1) return;
+            // Always play in Algorave/House, random in others if high intensity
+            if (this.intensity < 0.1 && this.beatMode !== 'algorave') return;
 
             if (this.beatMode === 'house' || this.beatMode === 'algorave') {
                 this.kick.triggerAttackRelease("C1", "8n", time);
             } else if (this.beatMode === 'breakbeat' || this.beatMode === 'exotic_groove') {
-                this.kick.triggerAttackRelease("C1", "8n", time);
+                // Syncopated kick
+                const pos16 = parseInt(Tone.Transport.position.toString().split(':')[2]);
+                if (pos16 === 0 || pos16 === 2.5) this.kick.triggerAttackRelease("C1", "8n", time);
+                else if (Math.random() < 0.3) this.kick.triggerAttackRelease("C1", "8n", time);
             }
         }, "4n");
 
@@ -230,37 +240,50 @@ export class KaleidoscopeAudio {
             const posBeat = parseInt(Tone.Transport.position.toString().split(':')[1]);
 
             if (this.beatMode === 'house' || this.beatMode === 'algorave') {
+                // Harder snare pattern
                 if (posBeat === 1 || posBeat === 3) this.snare.triggerAttackRelease("8n", time);
             } else if (this.beatMode === 'exotic_groove') {
                 if (posBeat === 2) this.snare.triggerAttackRelease("8n", time);
             }
 
-            // Random Crash in Algo mode
+            // Random Crash in Algo mode (More Frequent)
             if (this.beatMode === 'algorave' && posBeat === 0) {
-                if (Math.random() < 0.3) {
-                    this.crash.triggerAttackRelease("C2", "1m", time);
+                if (Math.random() < 0.5) {
+                    this.crash.triggerAttackRelease("C2", "1m", time, 0.8);
                 }
             }
         }, "4n");
 
 
-        // HiHat
+        // HiHat - More active
         this.hihatLoop = new Tone.Loop(time => {
             if (this.beatMode === 'ambient' || this.beatMode === 'choral' || this.beatMode === 'tumbling') return;
-            if (Math.random() < this.intensity || this.beatMode === 'algorave') {
+
+            if (this.beatMode === 'algorave') {
+                // 16th notes constant in algorave
+                this.hihat.triggerAttackRelease("32n", time, Math.random() * 0.5 + 0.5);
+            } else if (Math.random() < this.intensity) {
                 this.hihat.triggerAttackRelease("32n", time);
             }
         }, "16n");
 
 
-        // Bass
+        // Bass - Melodic Variation
         this.bassLoop = new Tone.Loop(time => {
             if (this.beatMode === 'choral' || this.beatMode === 'tumbling') return;
 
             const scale = this.scales[this.currentScaleName];
             if (!scale) return;
-            if (Math.random() > 0.6) return;
-            this.bass.triggerAttackRelease("C2", "16n", time);
+            // Play more often in Algo
+            if (Math.random() > 0.8 && this.beatMode !== 'algorave') return;
+
+            // Pick a bass note from lower register of current scale
+            // Map scale[0] (e.g. C4) down to C2
+            const noteIndex = Math.floor(Math.random() * 3); // Use first 3 notes of scale
+            const rootNoteStr = scale[noteIndex];
+            const note = rootNoteStr.slice(0, -1) + (Math.random() > 0.7 ? "1" : "2");
+
+            this.bass.triggerAttackRelease(note, "16n", time);
         }, "8n");
 
 
@@ -272,16 +295,18 @@ export class KaleidoscopeAudio {
             if (!scale) return;
 
             if (this.beatMode === 'algorave') {
-                // Aggressive single notes
-                if (Math.random() < 0.7) { // Busy
+                // Aggressive single notes - Arpeggio style
+                if (Math.random() < 0.8) {
                     const note = scale[Math.floor(Math.random() * scale.length)];
                     this.aggroLead.triggerAttackRelease(note, "16n", time);
                 }
             } else {
                 // Soft poly chords
-                const rootIdx = Math.floor(Math.random() * (scale.length - 2));
-                const chord = [scale[rootIdx], scale[rootIdx + 2]];
-                this.poly.triggerAttackRelease(chord, "1m", time);
+                if (scale.length > 2) {
+                    const rootIdx = Math.floor(Math.random() * (scale.length - 2));
+                    const chord = [scale[rootIdx], scale[rootIdx + 2]];
+                    this.poly.triggerAttackRelease(chord, "1m", time);
+                }
             }
         }, "1m");
 
@@ -470,9 +495,11 @@ export class KaleidoscopeAudio {
         if (this.glass) {
             const scale = this.scales[this.currentScaleName];
             if (!scale) return;
+            // Removed velocity check, rely on main.js calling this with valid velocity
             const noteIndex = Math.floor(Math.random() * scale.length);
             const note = scale[noteIndex];
-            const vel = Math.min(1.0, Math.max(0.3, velocity * 80));
+            // Boost velocity slightly for audibility
+            const vel = Math.min(1.0, Math.max(0.5, velocity * 100)); // Boost multiplier
             const dur = Math.random() > 0.5 ? "32n" : "16n";
             this.glass.triggerAttackRelease(note, dur, undefined, vel);
         }
@@ -527,5 +554,17 @@ export class KaleidoscopeAudio {
                 resolve();
             }, 2100);
         });
+    }
+
+    getEnergy() {
+        if (!this.isInitialized || !this.meter) return 0;
+        // Tone.Meter returns decibels (-Infinity to 0). 
+        // We want a normalized 0-1 value for visualization.
+        const db = this.meter.getValue();
+        // db is usually -60 to 0. 
+        // Normalize: -60 -> 0, 0 -> 1
+        let energy = (db + 60) / 60;
+        energy = Math.max(0, Math.min(1, energy)); // Clamp
+        return energy;
     }
 }

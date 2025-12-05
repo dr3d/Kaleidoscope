@@ -382,6 +382,12 @@ function animate() {
                 audio.performTextureReset();
             }
 
+            // 3. Randomize Mirrors (4-16)
+            const newSegments = 4 + Math.floor(Math.random() * 13);
+            uniforms.uSegments.value = newSegments;
+            if (inputSegments) inputSegments.value = newSegments;
+            if (valueSegments) valueSegments.innerText = newSegments;
+
             // 3. Reset Timer
             window.lastMajorIdleTime = time;
             window.nextMajorIdleInterval = 30 + Math.random() * 90; // new random interval

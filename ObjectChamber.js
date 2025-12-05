@@ -164,7 +164,9 @@ export class ObjectChamber {
                     (Math.random() - 0.5) * 0.05,
                     (Math.random() - 0.5) * 0.05,
                     (Math.random() - 0.5) * 0.05
-                )
+                ),
+                baseScale: scale,
+                isReactive: Math.random() < 0.7 // 70% chance to be audio reactive
             };
 
             this.group.add(mesh);
@@ -248,6 +250,12 @@ export class ObjectChamber {
         const objects = this.objects;
         const count = objects.length;
 
+        // Audio Energy for Pulsing
+        let audioEnergy = 0;
+        if (this.audio && this.audio.getEnergy) {
+            audioEnergy = this.audio.getEnergy(); // 0.0 to 1.0
+        }
+
         // Collision Detection (Naive O(N^2) - OK for N < 100)
         for (let i = 0; i < count; i++) {
             const objA = objects[i];
@@ -299,6 +307,15 @@ export class ObjectChamber {
             if (obj.position.length() > 4.5) {
                 obj.userData.velocity.multiplyScalar(-1); // Bounce back
                 obj.position.add(obj.userData.velocity); // Move out of stuck
+            }
+
+            // Audio Reactivity (Scale Pulsing)
+            if (obj.userData.isReactive && obj.userData.baseScale) {
+                // Pulse size based on energy. 
+                // Thresholding: only pulse if energy is significant > 0.3
+                const pulse = Math.max(0, audioEnergy - 0.2) * 0.8;
+                const newScale = obj.userData.baseScale * (1.0 + pulse);
+                obj.scale.setScalar(newScale);
             }
         });
     }
@@ -390,7 +407,9 @@ export class ObjectChamber {
                 (Math.random() - 0.5) * 0.05,
                 (Math.random() - 0.5) * 0.05,
                 (Math.random() - 0.5) * 0.05
-            )
+            ),
+            baseScale: scale,
+            isReactive: Math.random() < 0.7 // 70% chance
         };
 
         this.group.add(mesh);
