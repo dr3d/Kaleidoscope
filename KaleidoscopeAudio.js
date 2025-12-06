@@ -282,12 +282,7 @@ export class KaleidoscopeAudio {
             if (this.beatMode === 'ambient' || this.beatMode === 'choral') return;
 
             if (this.beatMode === 'tumbling') {
-                // Rare metallic tinks (collision sounds)
-                if (Math.random() < 0.2) {
-                    // Very high pitch, short decay
-                    this.hihat.triggerAttackRelease(800 + Math.random() * 400, "64n", time, 0.1 + Math.random() * 0.2);
-                }
-                return;
+                return; // Handled by glassLoop now
             }
 
             if (this.beatMode === 'algorave') {
@@ -368,14 +363,34 @@ export class KaleidoscopeAudio {
             if (this.beatMode === 'tumbling') {
                 if (Math.random() < 0.6) { // High chance to play something
                     const scale = this.scales[this.currentScaleName];
-                    // Play a BURST of 3-5 notes very quickly
-                    const count = 3 + Math.floor(Math.random() * 3);
+                    // Play a BURST of 4-8 notes (Denser)
+                    const count = 4 + Math.floor(Math.random() * 4);
+
+                    // Collect events first to sort them by time
+                    // This prevents "time must be greater than last scheduled time" on monophonic HiHat
+                    const events = [];
                     for (let i = 0; i < count; i++) {
-                        const note = scale[Math.floor(Math.random() * scale.length)];
-                        const offset = Math.random() * 0.2; // Random tiny delay (0-200ms) within this 8n slot
-                        const vel = 0.3 + Math.random() * 0.7; // Varying velocity
-                        this.glass.triggerAttackRelease(note, "64n", time + offset, vel); // Sharper (64n)
+                        events.push({
+                            note: scale[Math.floor(Math.random() * scale.length)],
+                            offset: Math.random() * 0.25,
+                            vel: 0.5 + Math.random() * 0.5
+                        });
                     }
+
+                    // Sort by offset time (CRITICAL FIX for Monophonic Synth)
+                    events.sort((a, b) => a.offset - b.offset);
+
+                    events.forEach(ev => {
+                        // 1. Tonal Body (Glass Synth - Poly, so order less critical)
+                        // Randomly shift up an octave for sparkles
+                        const playNote = (Math.random() > 0.5) ? Tone.Frequency(ev.note).transpose(12) : ev.note;
+                        this.glass.triggerAttackRelease(playNote, "16n", time + ev.offset, ev.vel);
+
+                        // 2. Metallic Transient (HiHat - Monophonic, MUST be ordered)
+                        if (this.hihat) {
+                            this.hihat.triggerAttackRelease(2000 + Math.random() * 3000, "64n", time + ev.offset, ev.vel * 0.7);
+                        }
+                    });
                 }
                 return;
             }
