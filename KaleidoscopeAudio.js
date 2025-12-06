@@ -33,6 +33,8 @@ export class KaleidoscopeAudio {
         this.glassLoop = null;
         this.windChimeLoop = null;
         this.choirLoop = null;
+        this.pitchWarpLoop = null;
+        this.schedulerLoop = null;
 
         // Scheduler
         this.nextSwitchId = null; // Track event ID
@@ -51,7 +53,11 @@ export class KaleidoscopeAudio {
             "Phrygian Dominant": ["C3", "Db3", "E3", "F3", "G3", "Ab3", "Bb3", "C4"],
             "Lydian": ["C4", "D4", "E4", "F#4", "G4", "A4", "B4", "C5"],
             "Whole Tone": ["C4", "D4", "E4", "F#4", "Ab4", "Bb4", "C5"],
-            "Enigmatic": ["C4", "Db4", "E4", "F#4", "Ab4", "Bb4", "B4", "C5"]
+            "Enigmatic": ["C4", "Db4", "E4", "F#4", "Ab4", "Bb4", "B4", "C5"],
+            "Byzantine": ["C4", "Db4", "E4", "F4", "G4", "Ab4", "B4", "C5"],
+            "Hungarian Minor": ["C4", "D4", "Eb4", "F#4", "G4", "Ab4", "B4", "C5"],
+            "Iwato": ["C4", "Db4", "F4", "Gb4", "Bb4", "C5", "Db5"],
+            "Kumoi": ["C4", "D4", "Eb4", "G4", "A4", "C5", "D5"]
         };
         this.scaleKeys = Object.keys(this.scales);
     }
@@ -66,6 +72,9 @@ export class KaleidoscopeAudio {
         // --- Master Effects ---
         this.masterFilter = new Tone.Filter(2000, "lowpass").toDestination();
         const limiter = new Tone.Limiter(-2).connect(this.masterFilter);
+
+        // Removed PitchShift (Was inaudible). Replaced with Global Synth Detune.
+
         this.reverb = new Tone.Reverb(6).connect(limiter);
         this.delay = new Tone.PingPongDelay("8n.", 0.25).connect(this.reverb);
         this.dist = new Tone.Distortion(0.0).connect(limiter);
@@ -73,7 +82,7 @@ export class KaleidoscopeAudio {
 
         // --- Analysis ---
         this.meter = new Tone.Meter({ smoothing: 0.8 });
-        this.masterFilter.connect(this.meter); // Connect master output to meter
+        this.masterFilter.connect(this.meter);
 
         // --- Instruments ---
 
@@ -89,7 +98,6 @@ export class KaleidoscopeAudio {
                 release: 1.4,
             }
         }).connect(limiter);
-        // Boost Kick
         this.kick.volume.value = 0;
 
         // 2. Snare
@@ -115,7 +123,7 @@ export class KaleidoscopeAudio {
             resonance: 4000,
             octaves: 1.5
         }).connect(this.reverb);
-        this.crash.volume.value = -6; // Boosted from -10
+        this.crash.volume.value = -6;
 
         // 4. HiHat
         this.hihat = new Tone.MetalSynth({
@@ -130,7 +138,7 @@ export class KaleidoscopeAudio {
             resonance: 4000,
             octaves: 1.5
         }).connect(this.reverb);
-        this.hihat.volume.value = -8; // Boosted from -12
+        this.hihat.volume.value = -8;
 
         // 5. Bass
         this.bass = new Tone.MonoSynth({
@@ -150,7 +158,7 @@ export class KaleidoscopeAudio {
                 octaves: 2.5
             }
         }).connect(this.dist);
-        this.bass.volume.value = -3; // Boosted from -6
+        this.bass.volume.value = -3;
 
         // 6. Lead (Soft)
         this.poly = new Tone.PolySynth(Tone.Synth, {
@@ -166,7 +174,7 @@ export class KaleidoscopeAudio {
                 release: 1.5
             }
         }).connect(this.delay);
-        this.poly.volume.value = -8; // Slight boost
+        this.poly.volume.value = -8;
 
         // 7. AggroLead (New) - For Algorave
         this.aggroLead = new Tone.MonoSynth({
@@ -186,7 +194,7 @@ export class KaleidoscopeAudio {
                 octaves: 4
             }
         }).connect(this.dist);
-        this.aggroLead.volume.value = -6;
+        this.aggroLead.volume.value = -3; // Boosted for EDM presence
 
         // 8. Glass
         this.glass = new Tone.PolySynth(Tone.Synth, {
@@ -198,7 +206,7 @@ export class KaleidoscopeAudio {
                 release: 2
             }
         }).connect(this.delay);
-        this.glass.volume.value = -2; // Boosted for collisions
+        this.glass.volume.value = -2;
 
         // 9. Choir
         this.choir = new Tone.PolySynth(Tone.Synth, {
@@ -219,8 +227,9 @@ export class KaleidoscopeAudio {
 
         // Kick Logic
         this.kickLoop = new Tone.Loop(time => {
+            // STRICTLY NO KICK IN TUMBLING/CHORAL
             if (this.beatMode === 'choral' || this.beatMode === 'tumbling') return;
-            // Always play in Algorave/House, random in others if high intensity
+            // Always play in Algorave/House
             if (this.intensity < 0.1 && this.beatMode !== 'algorave') return;
 
             if (this.beatMode === 'house' || this.beatMode === 'algorave') {
@@ -235,6 +244,7 @@ export class KaleidoscopeAudio {
 
         // Snare Logic
         this.snareLoop = new Tone.Loop(time => {
+            // STRICTLY NO SNARE IN TUMBLING
             if (this.beatMode === 'choral' || this.beatMode === 'tumbling') return;
 
             const posBeat = parseInt(Tone.Transport.position.toString().split(':')[1]);
@@ -254,22 +264,30 @@ export class KaleidoscopeAudio {
             }
         }, "4n");
 
-
         // HiHat - More active
         this.hihatLoop = new Tone.Loop(time => {
-            if (this.beatMode === 'ambient' || this.beatMode === 'choral' || this.beatMode === 'tumbling') return;
+            // STRICTLY NO HIHAT IN AMBIENT/CHORAL
+            if (this.beatMode === 'ambient' || this.beatMode === 'choral') return;
+
+            if (this.beatMode === 'tumbling') {
+                // Rare metallic tinks (collision sounds)
+                if (Math.random() < 0.2) {
+                    // Very high pitch, short decay
+                    this.hihat.triggerAttackRelease(800 + Math.random() * 400, "64n", time, 0.1 + Math.random() * 0.2);
+                }
+                return;
+            }
 
             if (this.beatMode === 'algorave') {
-                // 16th notes constant in algorave
-                this.hihat.triggerAttackRelease("32n", time, Math.random() * 0.5 + 0.5);
+                this.hihat.triggerAttackRelease(200, "32n", time, Math.random() * 0.5 + 0.5);
             } else if (Math.random() < this.intensity) {
-                this.hihat.triggerAttackRelease("32n", time);
+                this.hihat.triggerAttackRelease(200, "32n", time);
             }
         }, "16n");
 
-
         // Bass - Melodic Variation
         this.bassLoop = new Tone.Loop(time => {
+            // STRICTLY NO BASS IN TUMBLING
             if (this.beatMode === 'choral' || this.beatMode === 'tumbling') return;
 
             const scale = this.scales[this.currentScaleName];
@@ -278,17 +296,18 @@ export class KaleidoscopeAudio {
             if (Math.random() > 0.8 && this.beatMode !== 'algorave') return;
 
             // Pick a bass note from lower register of current scale
-            // Map scale[0] (e.g. C4) down to C2
             const noteIndex = Math.floor(Math.random() * 3); // Use first 3 notes of scale
             const rootNoteStr = scale[noteIndex];
             const note = rootNoteStr.slice(0, -1) + (Math.random() > 0.7 ? "1" : "2");
 
-            this.bass.triggerAttackRelease(note, "16n", time);
+            try {
+                this.bass.triggerAttackRelease(note, "16n", time);
+            } catch (e) { }
         }, "8n");
-
 
         // Chords / Melody (Lead)
         this.chordLoop = new Tone.Loop(time => {
+            // Tumbling gets NO chords, just texture
             if (this.beatMode === 'choral' || this.beatMode === 'tumbling') return;
 
             const scale = this.scales[this.currentScaleName];
@@ -298,7 +317,9 @@ export class KaleidoscopeAudio {
                 // Aggressive single notes - Arpeggio style
                 if (Math.random() < 0.8) {
                     const note = scale[Math.floor(Math.random() * scale.length)];
-                    this.aggroLead.triggerAttackRelease(note, "16n", time);
+                    try {
+                        this.aggroLead.triggerAttackRelease(note, "16n", time);
+                    } catch (e) { }
                 }
             } else {
                 // Soft poly chords
@@ -310,19 +331,17 @@ export class KaleidoscopeAudio {
             }
         }, "1m");
 
-
         // Choir Loop
         this.choirLoop = new Tone.Loop(time => {
-            if (this.beatMode === 'tumbling') return;
+            // ENABLED for Choral ONLY (Disabled in Tumbling to differentiate)
+            if (this.beatMode === 'algorave' || this.beatMode === 'tumbling') return;
             if (this.beatMode !== 'choral' && Math.random() > 0.3) return;
-            if (this.beatMode === 'algorave') return; // No choir in hard mode
 
             const scale = this.scales[this.currentScaleName];
             if (!scale) return;
 
             const notes = [];
             const rootIdx = Math.floor(Math.random() * (scale.length - 3));
-
             notes.push(scale[rootIdx]);
             notes.push(scale[rootIdx + 2]);
             if (Math.random() > 0.5) notes.push(scale[rootIdx + 4]);
@@ -331,10 +350,25 @@ export class KaleidoscopeAudio {
             this.choir.triggerAttackRelease(notes, duration, time);
         }, "2m");
 
-
         // Glass: Collision-Like Melody
         this.glassLoop = new Tone.Loop(time => {
-            if (this.beatMode === 'tumbling') return;
+            // Special TUMBLING Logic: Chaotic Bursts
+            if (this.beatMode === 'tumbling') {
+                if (Math.random() < 0.6) { // High chance to play something
+                    const scale = this.scales[this.currentScaleName];
+                    // Play a BURST of 3-5 notes very quickly
+                    const count = 3 + Math.floor(Math.random() * 3);
+                    for (let i = 0; i < count; i++) {
+                        const note = scale[Math.floor(Math.random() * scale.length)];
+                        const offset = Math.random() * 0.2; // Random tiny delay (0-200ms) within this 8n slot
+                        const vel = 0.3 + Math.random() * 0.7; // Varying velocity
+                        this.glass.triggerAttackRelease(note, "64n", time + offset, vel); // Sharper (64n)
+                    }
+                }
+                return;
+            }
+
+            // Standard Logic
             if (Math.random() < 0.4) {
                 const scale = this.scales[this.currentScaleName];
                 const note = scale[Math.floor(Math.random() * scale.length)];
@@ -342,43 +376,47 @@ export class KaleidoscopeAudio {
             }
         }, "8n");
 
-        // Wind Chimes (New): Background Texture
+        // Wind Chimes
         this.windChimeLoop = new Tone.Loop(time => {
-            // Constant tinkling in quiet modes
             const quietModes = ['ambient', 'choral', 'tumbling'];
             if (!quietModes.includes(this.beatMode)) return;
 
             if (Math.random() < 0.25) {
                 const scale = this.scales[this.currentScaleName];
                 const note = scale[Math.floor(Math.random() * scale.length)];
-                this.glass.triggerAttackRelease(note, "32n", time, 0.3); // Low velocity
+                this.glass.triggerAttackRelease(note, "32n", time, 0.3);
             }
-        }, "16n");
+        }, "4m");
 
+        // Pitch Warp Loop - GLOBAL DETUNE
+        this.pitchWarpLoop = new Tone.Loop(time => {
+            if (!this.isPlaying) return;
+            if (Math.random() < 0.5) {
+                const attackBars = 0.5 + Math.random() * 3.5;
+                const holdBars = 1 + Math.random() * 2;
+                const dir = Math.random() > 0.5 ? 1 : -1;
+                const semitones = (Math.random() * 6 + 6) * dir;
+                this.triggerGlobalPitchWarp(semitones, attackBars, holdBars);
+            }
+        }, "4m");
 
-        // --- Scheduler (Variable Timing) ---
-        // Instead of a Loop, we schedule recursively
-        this.scheduleNextSwitch = () => {
+        // --- Scheduler (Countdown Loop) ---
+        this.remainingBars = 4; // Initial wait
+
+        this.schedulerLoop = new Tone.Loop(time => {
             if (!this.isPlaying) return;
 
-            // Pick next interval: 4, 8, 12, or 16 bars
-            const bars = [4, 8, 12, 16];
-            const nextBars = bars[Math.floor(Math.random() * bars.length)];
-            const timeString = `+${nextBars}m`;
+            console.log(`Audio: Next mode switch in ${this.remainingBars} measures`);
+            this.remainingBars--;
 
-            console.log(`Next switch in ${nextBars} bars`);
-
-            // Cancel any previous pending switch just in case
-            if (this.nextSwitchId !== null) {
-                Tone.Transport.clear(this.nextSwitchId);
-            }
-
-            this.nextSwitchId = Tone.Transport.scheduleOnce((time) => {
+            if (this.remainingBars <= 0) {
                 this.performModeSwitch(time);
-                this.scheduleNextSwitch(); // Recurse
-            }, timeString);
-        };
-
+                // Pick next duration
+                const bars = [4, 8, 12];
+                this.remainingBars = bars[Math.floor(Math.random() * bars.length)];
+                console.log(`(Timer Reset: Waiting ${this.remainingBars} bars)`);
+            }
+        }, "1m");
 
         // Schedule start
         this.kickLoop.start(0);
@@ -389,34 +427,68 @@ export class KaleidoscopeAudio {
         this.glassLoop.start(0);
         this.choirLoop.start(0);
         this.windChimeLoop.start(0);
+        this.pitchWarpLoop.start(1);
+        this.schedulerLoop.start(0);
 
         this.isInitialized = true;
+    }
+
+    start() {
+        if (!this.isInitialized) return;
+        if (this.isPlaying) return;
+
+        if (Tone.Transport.state !== 'started') {
+            Tone.Transport.start();
+        }
+        this.isPlaying = true;
+    }
+
+    stop() {
+        this.isPlaying = false;
+        Tone.Transport.stop();
+
+        if (this.poly) this.poly.releaseAll();
+        if (this.glass) this.glass.releaseAll();
+        if (this.choir) this.choir.releaseAll();
     }
 
     performModeSwitch(time) {
         // 1. Cycle Marker Sound
         if (this.crash && this.glass) {
-            this.crash.triggerAttackRelease("C2", "2n", time, 0.5); // Accented crash
-
+            this.crash.triggerAttackRelease("C2", "2n", time, 0.5);
             const scale = this.scales["Major Pentatonic"];
-            if (scale && scale.length >= 5) { // Safety Check
+            if (scale && scale.length >= 5) {
                 this.glass.triggerAttackRelease([scale[0], scale[2], scale[4]], "8n", time, 0.4);
             }
         }
 
         // 2. Logic Update
-        const r = Math.random();
-        let newMode = 'ambient';
+        let newMode = this.beatMode;
+        let attempts = 0;
 
-        if (this.intensity > 0.6) {
-            if (r < 0.4) newMode = 'algorave';
-            else if (r < 0.7) newMode = 'house';
-            else newMode = 'exotic_groove';
-        } else {
-            if (r < 0.3) newMode = 'choral';
-            else if (r < 0.5) newMode = 'tumbling';
-            else if (r < 0.8) newMode = 'ambient';
-            else newMode = 'exotic_groove';
+        // Try up to 5 times to pick a DIFFERENT mode
+        while (newMode === this.beatMode && attempts < 5) {
+            attempts++;
+            const r = Math.random();
+            if (this.intensity > 0.6) {
+                // Boosted Algorave Chance
+                if (r < 0.6) newMode = 'algorave'; // Was 0.4
+                else if (r < 0.8) newMode = 'house';
+                else newMode = 'exotic_groove';
+            } else {
+                if (r < 0.3) newMode = 'choral';
+                else if (r < 0.5) newMode = 'tumbling';
+                else if (r < 0.7) newMode = 'ambient';
+                else if (r < 0.8) newMode = 'algorave'; // Surprise Algo!
+                else newMode = 'exotic_groove';
+            }
+        }
+
+        // Failsafe
+        if (newMode === this.beatMode) {
+            const allModes = ['ambient', 'choral', 'tumbling', 'algorave', 'house', 'exotic_groove'];
+            const others = allModes.filter(m => m !== this.beatMode);
+            newMode = others[Math.floor(Math.random() * others.length)];
         }
 
         // Exotic Scale Rotation
@@ -430,42 +502,15 @@ export class KaleidoscopeAudio {
 
         // Param Updates
         if (this.beatMode === 'algorave') {
-            this.dist.wet.rampTo(0.6, 1);
+            this.dist.wet.rampTo(0.8, 1); // Harder distortion for EDM
             Tone.Transport.bpm.rampTo(135 + Math.random() * 10, 2);
         } else if (this.beatMode === 'choral' || this.beatMode === 'tumbling') {
             this.dist.wet.rampTo(0.0, 1);
             Tone.Transport.bpm.rampTo(80, 5);
         } else {
-            this.dist.wet.rampTo(0.0, 1);
+            this.dist.wet.rampTo(0.2, 1); // Mild grit
             Tone.Transport.bpm.rampTo(110, 4);
         }
-    }
-
-    start() {
-        if (!this.isInitialized) return;
-        if (this.isPlaying) return;
-
-        if (Tone.Transport.state !== 'started') {
-            Tone.Transport.start();
-        }
-        this.isPlaying = true;
-
-        // Kick off the variable scheduler
-        this.scheduleNextSwitch();
-    }
-
-    stop() {
-        this.isPlaying = false;
-        Tone.Transport.stop();
-        // Clear the specific scheduled event
-        if (this.nextSwitchId !== null) {
-            Tone.Transport.clear(this.nextSwitchId);
-            this.nextSwitchId = null;
-        }
-
-        if (this.poly) this.poly.releaseAll();
-        if (this.glass) this.glass.releaseAll();
-        if (this.choir) this.choir.releaseAll();
     }
 
     updateParams(speedMult, currentTheme) {
@@ -509,6 +554,9 @@ export class KaleidoscopeAudio {
         if (!this.isInitialized || !this.isPlaying) return;
         console.log("Audio: Performing Texture Reset (Fade & Params)");
 
+        // Reset the countdown logic
+        this.remainingBars = 4; // Reset to short interval initially
+
         // 1. Fade Out
         Tone.Destination.volume.rampTo(-60, 2);
 
@@ -551,8 +599,51 @@ export class KaleidoscopeAudio {
                 // We didn't stop, so just ramp volume back up
                 Tone.Destination.volume.rampTo(0, 4);
 
+                // IMPORTANT: Restart logic
+                if (this.nextSwitchId) Tone.Transport.clear(this.nextSwitchId);
+                // Also reset scheduler loop state if needed
+                this.remainingBars = 4;
+
                 resolve();
             }, 2100);
+        });
+    }
+
+    triggerGlobalPitchWarp(semitones, attackBars, holdBars) {
+        if (!this.isInitialized || !this.isPlaying) return;
+
+        const bpm = Tone.Transport.bpm.value; // Approximate current BPM
+        const spm = (60 / Math.max(1, bpm)) * 4;
+
+        const attackDur = attackBars * spm;
+        const holdDur = holdBars * spm;
+        const totalDur = attackDur + holdDur;
+
+        const amountCents = semitones * 100;
+        const now = Tone.now();
+
+        console.log(`Audio: Pitch Warp! ${semitones.toFixed(1)}st (${amountCents.toFixed(0)} cents) over ${attackBars.toFixed(1)} bars`);
+
+        const instruments = [
+            this.kick, this.bass, this.poly,
+            this.aggroLead, this.glass, this.choir,
+            this.crash, this.hihat
+        ];
+
+        instruments.forEach(inst => {
+            if (!inst) return;
+            // Most synths have .detune
+            // Some might not, check safely
+            try {
+                if (inst.detune) {
+                    inst.detune.cancelScheduledValues(now);
+                    inst.detune.setValueAtTime(0, now);
+                    inst.detune.linearRampToValueAtTime(amountCents, now + attackDur);
+                    inst.detune.linearRampToValueAtTime(0, now + totalDur); // Return to 0
+                }
+            } catch (e) {
+                // Ignore instruments without detune or other errors
+            }
         });
     }
 
