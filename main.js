@@ -73,6 +73,7 @@ window.chamber = chamber;
 // --- Audio Engine ---
 import { KaleidoscopeAudio } from './KaleidoscopeAudio.js';
 const audio = new KaleidoscopeAudio();
+window.audio = audio; // Expose for debugging
 let btnAudio;
 
 // Connect Collision Audio
@@ -304,7 +305,14 @@ function animate() {
 
     // Idle Animation Logic
     const timeSinceInteraction = time - lastInteractionTime;
-    if (!isDragging && timeSinceInteraction > IDLE_THRESHOLD) {
+    const isIdle = !isDragging && timeSinceInteraction > IDLE_THRESHOLD;
+
+    // Notify Audio of Idle State
+    if (audio && audio.isInitialized) {
+        audio.setIdle(isIdle);
+    }
+
+    if (isIdle) {
         // Procedural "Wandering" Rotation
         // State: Move in a direction, slow down, stop, maybe reverse.
 

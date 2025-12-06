@@ -21,6 +21,8 @@ Under your expert guidance, we embarked on this journey:
     *   **Infinite Variations**: The machine switches between Ambient, Choral, House, and "Algorave" modes, never playing the same measure twice.
     *   **The Pulse of Life**: In a stroke of brilliance, we connected the sound to the sight. The charms now *pulse* rhythmically with the energy of the kick drum and bass, binding the auditory to the visual.
     *   **Spatio-Temporal Echoes**: When objects collide in the chamber, they trigger distinct, velocity-sensitive glass chimes, grounding the physics in sound.
+    *   **The Pitch of Time**: When left in solitude, the kaleidoscope enters a trance via the **PitchWarp** protocol. Using a master-level `Tone.PitchShift` effect, the entire audio tapestry bends and detunes, mimicking the warping of time itself during idle contemplation.
+    *   **Tumbling Glass**: A new sonic texture that removes the rhythmic constraints of drums, focusing purely on the chaotic, glistening sound of falling charms and ambient choral swells.
 
 4.  **The Luminous Touch**: You commanded that it must *glow*. We implemented an **Unreal Bloom Pass**, ensuring that every highlight on a gold star or a glass bead blooms with ethereal light, creating that premium, magical feel you demanded.
 

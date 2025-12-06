@@ -70,8 +70,20 @@ export class KaleidoscopeAudio {
         console.log("Audio Context Started");
 
         // --- Master Effects ---
+        // --- Master Effects ---
         this.masterFilter = new Tone.Filter(2000, "lowpass").toDestination();
-        const limiter = new Tone.Limiter(-2).connect(this.masterFilter);
+
+        // PitchShifter (Insert Effect)
+        // windowSize 0.1 is standard, delayTime 0 minimizes latency
+        this.pitchShifter = new Tone.PitchShift({
+            pitch: 0,
+            windowSize: 0.1,
+            delayTime: 0,
+            feedback: 0
+        }).connect(this.masterFilter);
+
+        // Limiter feeds into PitchShifter -> MasterFilter
+        const limiter = new Tone.Limiter(-2).connect(this.pitchShifter);
 
         // Removed PitchShift (Was inaudible). Replaced with Global Synth Detune.
 
@@ -259,7 +271,7 @@ export class KaleidoscopeAudio {
             // Random Crash in Algo mode (More Frequent)
             if (this.beatMode === 'algorave' && posBeat === 0) {
                 if (Math.random() < 0.5) {
-                    this.crash.triggerAttackRelease("C2", "1m", time, 0.8);
+                    this.crash.triggerAttackRelease("C2", "1m", time + 0.03, 0.8);
                 }
             }
         }, "4n");
@@ -388,10 +400,17 @@ export class KaleidoscopeAudio {
             }
         }, "4m");
 
-        // Pitch Warp Loop - GLOBAL DETUNE
+        this.isIdle = false; // New state
+
+        // Pitch Warp Loop - GLOBAL DETUNE (Only in IDLE)
         this.pitchWarpLoop = new Tone.Loop(time => {
             if (!this.isPlaying) return;
-            if (Math.random() < 0.5) {
+
+            // STRICTLY ONLY WHEN IDLE
+            if (!this.isIdle) return;
+
+            // Higher chance during idle to make it noticeable
+            if (Math.random() < 0.7) {
                 const attackBars = 0.5 + Math.random() * 3.5;
                 const holdBars = 1 + Math.random() * 2;
                 const dir = Math.random() > 0.5 ? 1 : -1;
@@ -431,6 +450,18 @@ export class KaleidoscopeAudio {
         this.schedulerLoop.start(0);
 
         this.isInitialized = true;
+    }
+
+    setIdle(state) {
+        if (this.isIdle !== state) {
+            this.isIdle = state;
+            console.log(`Audio: Idle State Changed to ${state}`);
+
+            // Immediate trigger on entering idle?
+            if (state && this.isPlaying) {
+                this.triggerGlobalPitchWarp(-12, 1, 2); // Drop octave immediately
+            }
+        }
     }
 
     start() {
@@ -624,27 +655,43 @@ export class KaleidoscopeAudio {
 
         console.log(`Audio: Pitch Warp! ${semitones.toFixed(1)}st (${amountCents.toFixed(0)} cents) over ${attackBars.toFixed(1)} bars`);
 
+
+
+        if (this.pitchShifter) {
+            try {
+                // Use Tone.js 'rampTo' which handles Signals/Params safely
+                // rampTo(value, rampTime, startTime)
+
+                // 1. Reset/Start
+                // Note: rampTo cancels previous scheduled values automatically in newer Tone versions, 
+                // but we can just schedule the moves.
+
+                const p = this.pitchShifter.pitch;
+
+                if (p && typeof p.rampTo === 'function') {
+                    p.rampTo(semitones, attackDur, now);
+                    p.rampTo(0, holdDur, now + attackDur);
+                } else {
+                    // Fallback
+                    this.pitchShifter.pitch = semitones;
+                    // setTimeout to reset? risky if bpm changes, but better than crash
+                }
+
+            } catch (e) {
+                console.warn("PitchWarp automation failed:", e);
+            }
+        }
+
+        /* 
+        // LEGACY DETUNE LOGIC (Proven Inaudible)
         const instruments = [
             this.kick, this.bass, this.poly,
             this.aggroLead, this.glass, this.choir,
             this.crash, this.hihat
         ];
 
-        instruments.forEach(inst => {
-            if (!inst) return;
-            // Most synths have .detune
-            // Some might not, check safely
-            try {
-                if (inst.detune) {
-                    inst.detune.cancelScheduledValues(now);
-                    inst.detune.setValueAtTime(0, now);
-                    inst.detune.linearRampToValueAtTime(amountCents, now + attackDur);
-                    inst.detune.linearRampToValueAtTime(0, now + totalDur); // Return to 0
-                }
-            } catch (e) {
-                // Ignore instruments without detune or other errors
-            }
-        });
+        instruments.forEach(inst => { ... });
+        */
     }
 
     getEnergy() {
