@@ -39,6 +39,9 @@ export class KaleidoscopeAudio {
         // Scheduler
         this.nextSwitchId = null; // Track event ID
 
+        // Timing tracking for monophonic instruments
+        this.lastHihatTime = 0;
+
         // Journey State
         this.intensity = 0.5; // 0 to 1
         this.beatMode = 'ambient';
@@ -285,10 +288,14 @@ export class KaleidoscopeAudio {
                 return; // Handled by glassLoop now
             }
 
+            // Ensure hihat timing is always strictly increasing
+            const safeTime = Math.max(time, this.lastHihatTime + 0.01);
+            this.lastHihatTime = safeTime;
+
             if (this.beatMode === 'algorave') {
-                this.hihat.triggerAttackRelease(200, "32n", time, Math.random() * 0.5 + 0.5);
+                this.hihat.triggerAttackRelease(200, "32n", safeTime, Math.random() * 0.5 + 0.5);
             } else if (Math.random() < this.intensity) {
-                this.hihat.triggerAttackRelease(200, "32n", time);
+                this.hihat.triggerAttackRelease(200, "32n", safeTime);
             }
         }, "16n");
 
@@ -389,12 +396,9 @@ export class KaleidoscopeAudio {
                     // Sort by offset time (CRITICAL FIX for Monophonic Synth)
                     events.sort((a, b) => a.offset - b.offset);
 
-                    // Track last scheduled time for monophonic hihat
-                    let lastHihatTime = Math.max(time, Tone.now());
-
                     events.forEach(ev => {
                         // Ensure scheduling time is always in the future
-                        const baseScheduleTime = Math.max(time + ev.offset, Tone.now() + 0.001);
+                        const baseScheduleTime = Math.max(time + ev.offset, Tone.now() + 0.01);
 
                         // 1. Tonal Body (Glass Synth - Poly, can overlap)
                         // Randomly shift up an octave for sparkles
@@ -403,10 +407,10 @@ export class KaleidoscopeAudio {
 
                         // 2. Metallic Transient (HiHat - Monophonic, needs strictly increasing times)
                         if (this.hihat) {
-                            // Ensure each hihat trigger is strictly after the previous one
-                            const hihatTime = Math.max(baseScheduleTime, lastHihatTime + 0.001);
+                            // Ensure each hihat trigger is strictly after the previous one AND after current time
+                            const hihatTime = Math.max(baseScheduleTime, this.lastHihatTime + 0.01);
                             this.hihat.triggerAttackRelease(2000 + Math.random() * 3000, "64n", hihatTime, ev.vel * 0.7);
-                            lastHihatTime = hihatTime;
+                            this.lastHihatTime = hihatTime;
                         }
                     });
                 }
@@ -504,6 +508,10 @@ export class KaleidoscopeAudio {
         if (Tone.Transport.state !== 'started') {
             Tone.Transport.start();
         }
+
+        // Initialize hihat timing to current time
+        this.lastHihatTime = Tone.now();
+
         this.isPlaying = true;
     }
 
