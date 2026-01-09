@@ -5,16 +5,17 @@ export class ObjectChamber {
     constructor(renderer, width, height) {
         this.renderer = renderer;
         this.scene = new THREE.Scene();
-        this.camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100); // Aspect ratio 1:1 for the texture
-        this.camera.position.z = 10;
+        this.camera = new THREE.PerspectiveCamera(60, 1, 0.1, 100); // Wider FOV for fuller view
+        this.camera.position.z = 7; // Closer for more density
 
-        // Render Target for the chamber view
-        this.renderTarget = new THREE.WebGLRenderTarget(1024, 1024, {
+        // Render Target for the chamber view (enhanced resolution with MSAA)
+        this.renderTarget = new THREE.WebGLRenderTarget(2048, 2048, {
             minFilter: THREE.LinearFilter,
             magFilter: THREE.LinearFilter,
             format: THREE.RGBAFormat,
             wrapS: THREE.RepeatWrapping,
-            wrapT: THREE.RepeatWrapping
+            wrapT: THREE.RepeatWrapping,
+            samples: 4 // MSAA antialiasing
         });
 
         this.objects = [];
@@ -29,8 +30,8 @@ export class ObjectChamber {
 
         // --- Lighting & Environment ---
 
-        // 1. Backlight (The "Sun" at the end of the tube)
-        this.backlight = new THREE.PointLight(0xffffff, 5.0, 20);
+        // 1. Backlight (The "Sun" at the end of the tube) - Reduced to prevent hot spot
+        this.backlight = new THREE.PointLight(0xffffff, 4.0, 20); // Reduced from 8.0
         this.backlight.position.set(0, 0, -5); // Behind objects
         this.scene.add(this.backlight);
 
@@ -43,6 +44,21 @@ export class ObjectChamber {
         const fillLight = new THREE.AmbientLight(0x404040, 2.0); // Higher ambient for glass
         this.scene.add(fillLight);
 
+        // 3. Multiple colored accent lights for more sparkle
+        const accentColors = [0xff6b6b, 0x4ecdc4, 0xffe66d, 0xa8e6cf];
+        this.accentLights = [];
+        for (let i = 0; i < 4; i++) {
+            const accentLight = new THREE.PointLight(accentColors[i], 3.0, 15);
+            const angle = (i / 4) * Math.PI * 2;
+            accentLight.position.set(
+                Math.cos(angle) * 6,
+                Math.sin(angle) * 6,
+                0
+            );
+            this.scene.add(accentLight);
+            this.accentLights.push(accentLight);
+        }
+
         // 3. Procedural HDR Environment
         this.pmremGenerator = new THREE.PMREMGenerator(this.renderer);
         this.pmremGenerator.compileEquirectangularShader();
@@ -51,6 +67,22 @@ export class ObjectChamber {
         this.scene.background = new THREE.Color(0x101010);
 
         this.updateEnvironment();
+
+        // Camera movement system
+        this.cameraMode = 'inside'; // 'static', 'inside', 'orbital', 'drift', 'figure8', 'follow'
+        this.cameraTime = 0;
+        this.cameraDriftVel = new THREE.Vector3(
+            (Math.random() - 0.5) * 0.01,
+            (Math.random() - 0.5) * 0.01,
+            (Math.random() - 0.5) * 0.005
+        );
+        this.cameraTarget = new THREE.Vector3(0, 0, 0);
+
+        // Randomly pick a camera mode at start
+        const modes = ['inside', 'orbital', 'drift', 'figure8', 'follow'];
+        this.cameraMode = modes[Math.floor(Math.random() * modes.length)];
+        console.log('Camera Mode:', this.cameraMode);
+
         this.buildNew();
     }
 
@@ -95,12 +127,12 @@ export class ObjectChamber {
         const theme = this.currentTheme;
         console.log('Selected Theme:', theme);
 
-        // Create new objects
-        const numObjects = count || (30 + Math.floor(Math.random() * 30));
+        // Create new objects (increased density)
+        const numObjects = count || (50 + Math.floor(Math.random() * 50)); // 50-100 instead of 30-60
 
         for (let i = 0; i < numObjects; i++) {
             let mesh;
-            const scale = 0.3 + Math.random() * 1.2;
+            const scale = 0.4 + Math.random() * 0.6; // Smaller, more uniform: 0.4-1.0 instead of 0.3-1.5
             let color = this.getThemeColor(theme);
 
             // Select Object Type based on Theme
@@ -139,12 +171,16 @@ export class ObjectChamber {
             // Fallback if mesh creation failed
             if (!mesh) mesh = this.createStandardGem(scale, color);
 
-            // Random position
+            // Random position (tighter clustering with depth)
             mesh.position.set(
-                (Math.random() - 0.5) * 6,
-                (Math.random() - 0.5) * 6,
-                (Math.random() - 0.5) * 2
+                (Math.random() - 0.5) * 4, // Reduced from 6 to 4 for tighter clustering
+                (Math.random() - 0.5) * 4,
+                (Math.random() - 0.5) * 3  // Increased from 2 to 3 for more depth
             );
+
+            // Add center bias for denser core
+            const centerBias = 0.3;
+            mesh.position.multiplyScalar(1.0 - centerBias + Math.random() * centerBias);
 
             // Random rotation
             mesh.rotation.set(
@@ -208,24 +244,29 @@ export class ObjectChamber {
         let material;
         const matType = Math.random();
 
-        if (matType < 0.7) { // Glass / Gem
+        if (matType < 0.8) { // Glass / Gem (increased from 0.7 to 0.8 for more sparkle)
             material = new THREE.MeshPhysicalMaterial({
                 color: color,
-                metalness: 0.1,
-                roughness: 0.05,
-                transmission: 0.95,
-                thickness: 1.5,
-                ior: 1.5 + Math.random() * 0.5,
+                metalness: 0.0, // Pure glass
+                roughness: 0.01, // Very smooth for maximum reflection
+                transmission: 0.98, // Higher transmission
+                thickness: 2.0, // Increased thickness
+                ior: 1.8 + Math.random() * 0.4, // Diamond-like refraction (1.8-2.2)
                 clearcoat: 1.0,
+                clearcoatRoughness: 0.0, // Mirror-like clearcoat
                 attenuationColor: color,
-                attenuationDistance: 1.0
+                attenuationDistance: 0.8, // Richer color
+                emissive: color, // Self-illumination
+                emissiveIntensity: 0.1 + Math.random() * 0.15 // 0.1-0.25 glow (reduced from 0.3-0.5)
             });
-        } else if (matType < 0.9) { // Metallic
+        } else if (matType < 0.95) { // Metallic (increased from 0.9)
             material = new THREE.MeshStandardMaterial({
                 color: color,
                 metalness: 1.0,
-                roughness: 0.2,
-                envMapIntensity: 1.0
+                roughness: 0.1, // Smoother for more mirror-like
+                envMapIntensity: 2.5, // Enhanced reflections
+                emissive: color,
+                emissiveIntensity: 0.1 // Subtle glow (reduced from 0.2)
             });
         } else { // Matte / Plastic
             material = new THREE.MeshStandardMaterial({
@@ -246,6 +287,9 @@ export class ObjectChamber {
         // Slowly rotate the entire group to simulate holding the scope
         this.group.rotation.z = time * 0.1 * speed;
         this.group.rotation.x = Math.sin(time * 0.2 * speed) * 0.2;
+
+        // Update camera position based on mode
+        this.updateCameraPosition(time, speed);
 
         const objects = this.objects;
         const count = objects.length;
@@ -287,8 +331,8 @@ export class ObjectChamber {
                     // Calculate relative velocity for impact intensity
                     if (this.audio) {
                         const relVel = new THREE.Vector3().subVectors(objA.userData.velocity, objB.userData.velocity).length();
-                        // Only trigger if impact is significant enough
-                        if (relVel > 0.005) {
+                        // Trigger with lower threshold since we removed audio probability gate
+                        if (relVel > 0.003) {
                             this.audio.triggerCollisionSound(relVel);
                         }
                     }
@@ -440,6 +484,131 @@ export class ObjectChamber {
         for (let i = 0; i < count; i++) {
             if (this.objects.length > 0) this.removeRandomObject();
             this.addRandomObject(theme);
+        }
+    }
+
+    updateCameraPosition(time, speed = 1.0) {
+        this.cameraTime += 0.016 * speed; // Approximate delta time
+        const t = this.cameraTime;
+
+        switch(this.cameraMode) {
+            case 'static':
+                // Original static position
+                this.camera.position.set(0, 0, 7);
+                this.camera.lookAt(0, 0, 0);
+                break;
+
+            case 'inside':
+                // Camera moves INSIDE the object chamber, weaving through objects
+                const insideRadius = 2.0; // Stay within the object cluster
+                this.camera.position.x = Math.sin(t * 0.3) * insideRadius + Math.cos(t * 0.7) * 0.5;
+                this.camera.position.y = Math.cos(t * 0.25) * insideRadius + Math.sin(t * 0.6) * 0.5;
+                this.camera.position.z = Math.sin(t * 0.2) * 1.5 + 3.0; // Oscillate depth
+
+                // Look at a point that moves slightly
+                this.cameraTarget.x = Math.sin(t * 0.15) * 0.5;
+                this.cameraTarget.y = Math.cos(t * 0.18) * 0.5;
+                this.cameraTarget.z = 0;
+                this.camera.lookAt(this.cameraTarget);
+                break;
+
+            case 'orbital':
+                // Camera orbits around the center
+                const orbitRadius = 5.0;
+                const orbitSpeed = 0.2;
+                const orbitHeight = Math.sin(t * 0.15) * 1.5; // Bobbing up/down
+                this.camera.position.x = Math.cos(t * orbitSpeed) * orbitRadius;
+                this.camera.position.y = orbitHeight;
+                this.camera.position.z = Math.sin(t * orbitSpeed) * orbitRadius;
+                this.camera.lookAt(0, 0, 0);
+                break;
+
+            case 'drift':
+                // Slow random walk with momentum
+                this.cameraDriftVel.x += (Math.random() - 0.5) * 0.0002;
+                this.cameraDriftVel.y += (Math.random() - 0.5) * 0.0002;
+                this.cameraDriftVel.z += (Math.random() - 0.5) * 0.0001;
+
+                // Damping
+                this.cameraDriftVel.multiplyScalar(0.98);
+
+                // Apply velocity
+                this.camera.position.add(this.cameraDriftVel);
+
+                // Keep within bounds (soft boundaries)
+                const driftLimit = 6.0;
+                if (Math.abs(this.camera.position.x) > driftLimit) {
+                    this.cameraDriftVel.x *= -0.5;
+                    this.camera.position.x = Math.sign(this.camera.position.x) * driftLimit;
+                }
+                if (Math.abs(this.camera.position.y) > driftLimit) {
+                    this.cameraDriftVel.y *= -0.5;
+                    this.camera.position.y = Math.sign(this.camera.position.y) * driftLimit;
+                }
+                if (this.camera.position.z < 2 || this.camera.position.z > 10) {
+                    this.cameraDriftVel.z *= -0.5;
+                    this.camera.position.z = Math.max(2, Math.min(10, this.camera.position.z));
+                }
+
+                this.camera.lookAt(0, 0, 0);
+                break;
+
+            case 'figure8':
+                // Lissajous figure-8 pattern
+                const fig8Scale = 3.5;
+                this.camera.position.x = Math.sin(t * 0.2) * fig8Scale;
+                this.camera.position.y = Math.sin(t * 0.4) * fig8Scale * 0.7; // Different frequency
+                this.camera.position.z = Math.cos(t * 0.15) * 2.0 + 5.0;
+                this.camera.lookAt(0, 0, 0);
+                break;
+
+            case 'follow':
+                // Follow the closest object
+                if (this.objects.length > 0) {
+                    // Find closest object to current camera position
+                    let closestDist = Infinity;
+                    let closestObj = this.objects[0];
+
+                    for (const obj of this.objects) {
+                        const dist = this.camera.position.distanceTo(obj.position);
+                        if (dist < closestDist) {
+                            closestDist = dist;
+                            closestObj = obj;
+                        }
+                    }
+
+                    // Move camera toward closest object (with damping)
+                    const followSpeed = 0.02;
+                    const targetPos = closestObj.position.clone();
+                    targetPos.z += 3.0; // Stay behind the object
+
+                    this.camera.position.lerp(targetPos, followSpeed);
+
+                    // Look at the object
+                    this.camera.lookAt(closestObj.position);
+                }
+                break;
+        }
+    }
+
+    setCameraMode(mode) {
+        if (['static', 'inside', 'orbital', 'drift', 'figure8', 'follow'].includes(mode)) {
+            this.cameraMode = mode;
+            this.cameraTime = 0; // Reset time
+
+            // Reset camera position based on mode
+            if (mode === 'static') {
+                this.camera.position.set(0, 0, 7);
+            } else if (mode === 'drift') {
+                // Reset drift velocity
+                this.cameraDriftVel.set(
+                    (Math.random() - 0.5) * 0.01,
+                    (Math.random() - 0.5) * 0.01,
+                    (Math.random() - 0.5) * 0.005
+                );
+            }
+
+            console.log('Camera mode changed to:', mode);
         }
     }
 }

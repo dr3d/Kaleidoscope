@@ -236,6 +236,157 @@
             opacity: 0;
             pointer-events: none;
         }
+
+        .cursor-hidden {
+            cursor: none !important;
+        }
+
+        .cursor-hidden * {
+            cursor: none !important;
+        }
+
+        /* Status Panel */
+        .status-panel {
+            position: absolute;
+            top: 6rem;
+            left: 2rem;
+            background: var(--panel-bg);
+            backdrop-filter: blur(10px);
+            padding: 0.75rem 1rem;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            pointer-events: auto;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+            min-width: 280px;
+        }
+
+        .status-item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+        }
+
+        .status-label {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            opacity: 0.7;
+        }
+
+        .status-value {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--accent-color);
+        }
+
+        @media (max-width: 768px) {
+            .status-panel {
+                left: 50%;
+                transform: translateX(-50%);
+                top: 5rem;
+                grid-template-columns: 1fr;
+                min-width: 200px;
+                padding: 0.5rem 0.75rem;
+                gap: 0.5rem;
+            }
+
+            .controls {
+                flex-wrap: wrap;
+                max-width: 90%;
+                gap: 0.75rem;
+            }
+
+            .header h1 {
+                font-size: 1.2rem;
+            }
+
+            .header p {
+                font-size: 0.7rem;
+            }
+
+            .btn-primary {
+                padding: 0.6rem 1rem;
+                font-size: 0.85rem;
+            }
+        }
+
+        /* Icon buttons */
+        .btn-icon {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 0.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: white;
+            font-size: 1rem;
+        }
+
+        .btn-icon:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .btn-icon:active {
+            transform: translateY(0);
+        }
+
+        .btn-icon .icon {
+            display: block;
+        }
+
+        /* Select controls */
+        .select-control {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 0.4rem 0.6rem;
+            border-radius: 6px;
+            font-family: var(--font-main);
+            font-size: 0.8rem;
+            cursor: pointer;
+            outline: none;
+            width: 100px;
+        }
+
+        .select-control:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .select-control option {
+            background: #1a1a1a;
+        }
+
+        /* Focus indicators for accessibility */
+        .btn-primary:focus,
+        .btn-icon:focus {
+            outline: 2px solid var(--accent-color);
+            outline-offset: 2px;
+        }
+
+        input[type="range"]:focus {
+            outline: 2px solid var(--accent-color);
+            outline-offset: 4px;
+        }
+
+        .switch input:focus + .slider {
+            box-shadow: 0 0 0 2px var(--accent-color);
+        }
+
+        /* Reduced motion support */
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+
+            .ui-fade {
+                transition: opacity 0.01ms;
+            }
+        }
     </style>
     <script>
         window.onerror = function (msg, url, line, col, error) {
@@ -277,31 +428,72 @@
             <p>Artisan Digital Kaleidoscope</p>
         </div>
 
+        <div class="status-panel ui-fade" role="status" aria-live="polite">
+            <div class="status-item">
+                <span class="status-label">Theme</span>
+                <span class="status-value" id="status-theme">Gemstone</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Camera</span>
+                <span class="status-value" id="status-camera">Inside</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Audio Mode</span>
+                <span class="status-value" id="status-mode">—</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Scale</span>
+                <span class="status-value" id="status-scale">—</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Tempo</span>
+                <span class="status-value" id="status-tempo">—</span>
+            </div>
+        </div>
+
         <div class="controls ui-fade">
-            <button id="btn-build" class="btn-primary">
-                <span class="icon">✨</span> Build New Scope
+            <button id="btn-build" class="btn-primary" title="Build new scope (Space)" aria-label="Build new kaleidoscope with random objects">
+                <span class="icon" aria-hidden="true">✨</span> Build New Scope
             </button>
 
-            <button id="btn-audio" class="btn-primary" style="margin-right: 1rem;">
-                <span class="icon">🔊</span> Start Audio
+            <button id="btn-audio" class="btn-primary" style="margin-right: 1rem;" title="Toggle audio (A)" aria-label="Toggle generative audio">
+                <span class="icon" aria-hidden="true">🔊</span> Start Audio
+            </button>
+
+            <button id="btn-fullscreen" class="btn-icon" title="Toggle fullscreen (F)" aria-label="Toggle fullscreen mode">
+                <span class="icon" aria-hidden="true">⛶</span>
             </button>
 
             <div class="control-group">
-                <label>Speed</label>
-                <input type="range" id="speedSlider" min="1" max="40" step="1" value="10">
-                <span id="value-speed" style="min-width: 20px; text-align: right;">10</span>
+                <label for="speedSlider">Speed</label>
+                <input type="range" id="speedSlider" min="1" max="40" step="1" value="10"
+                       aria-label="Animation speed" aria-valuemin="1" aria-valuemax="40" aria-valuenow="10">
+                <span id="value-speed" style="min-width: 20px; text-align: right;" aria-live="polite">10</span>
             </div>
 
             <div id="group-mirrors" class="control-group">
-                <label>Mirrors</label>
-                <input type="range" id="input-segments" min="4" max="16" step="1" value="8">
-                <span id="value-segments" style="min-width: 20px; text-align: right;">8</span>
+                <label for="input-segments">Mirrors</label>
+                <input type="range" id="input-segments" min="4" max="16" step="1" value="8"
+                       aria-label="Number of mirror segments" aria-valuemin="4" aria-valuemax="16" aria-valuenow="8">
+                <span id="value-segments" style="min-width: 20px; text-align: right;" aria-live="polite">8</span>
             </div>
 
             <div id="group-count" class="control-group" style="display: none;">
                 <label>Items</label>
                 <input type="range" id="input-count" min="10" max="100" step="1" value="50">
                 <span id="value-count" style="min-width: 30px; text-align: right;">50</span>
+            </div>
+
+            <div class="control-group">
+                <label for="select-camera">Camera</label>
+                <select id="select-camera" class="select-control" aria-label="Camera movement mode">
+                    <option value="inside">Inside</option>
+                    <option value="orbital">Orbital</option>
+                    <option value="drift">Drift</option>
+                    <option value="figure8">Figure-8</option>
+                    <option value="follow">Follow</option>
+                    <option value="static">Static</option>
+                </select>
             </div>
 
             <div class="toggle-group">

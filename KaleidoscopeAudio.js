@@ -292,15 +292,24 @@ export class KaleidoscopeAudio {
             }
         }, "16n");
 
-        // Bass - Melodic Variation
+        // Bass - Melodic Variation (FIXED: Pattern-based instead of random probability)
+        this.bassPatternIndex = 0;
         this.bassLoop = new Tone.Loop(time => {
             // STRICTLY NO BASS IN TUMBLING
             if (this.beatMode === 'choral' || this.beatMode === 'tumbling') return;
 
             const scale = this.scales[this.currentScaleName];
             if (!scale) return;
-            // Play more often in Algo
-            if (Math.random() > 0.8 && this.beatMode !== 'algorave') return;
+
+            // Pattern-based bass (60-80% density instead of 20%)
+            const bassPattern = [1, 0, 1, 1, 0, 1, 1, 0]; // 60% density pattern
+            const algoPattern = [1, 1, 0, 1, 1, 1, 0, 1]; // 75% density for algorave
+
+            const pattern = (this.beatMode === 'algorave') ? algoPattern : bassPattern;
+            const shouldPlay = pattern[this.bassPatternIndex % pattern.length];
+            this.bassPatternIndex++;
+
+            if (!shouldPlay) return;
 
             // Pick a bass note from lower register of current scale
             const noteIndex = Math.floor(Math.random() * 3); // Use first 3 notes of scale
@@ -381,14 +390,17 @@ export class KaleidoscopeAudio {
                     events.sort((a, b) => a.offset - b.offset);
 
                     events.forEach(ev => {
+                        // Ensure scheduling time is always in the future
+                        const scheduleTime = Math.max(time + ev.offset, Tone.now() + 0.001);
+
                         // 1. Tonal Body (Glass Synth - Poly, so order less critical)
                         // Randomly shift up an octave for sparkles
                         const playNote = (Math.random() > 0.5) ? Tone.Frequency(ev.note).transpose(12) : ev.note;
-                        this.glass.triggerAttackRelease(playNote, "16n", time + ev.offset, ev.vel);
+                        this.glass.triggerAttackRelease(playNote, "16n", scheduleTime, ev.vel);
 
                         // 2. Metallic Transient (HiHat - Monophonic, MUST be ordered)
                         if (this.hihat) {
-                            this.hihat.triggerAttackRelease(2000 + Math.random() * 3000, "64n", time + ev.offset, ev.vel * 0.7);
+                            this.hihat.triggerAttackRelease(2000 + Math.random() * 3000, "64n", scheduleTime, ev.vel * 0.7);
                         }
                     });
                 }
@@ -546,16 +558,37 @@ export class KaleidoscopeAudio {
         this.beatMode = newMode;
         console.log(`Audio Mode Switch: ${newMode} | Scale: ${this.currentScaleName} | Int: ${this.intensity.toFixed(2)}`);
 
-        // Param Updates
+        // Signal to main.js that mode changed (for camera randomization)
+        if (window.onAudioModeChange) {
+            window.onAudioModeChange(newMode);
+        }
+
+        // Param Updates (ENHANCED: Mode-specific reverb/delay/distortion)
         if (this.beatMode === 'algorave') {
             this.dist.wet.rampTo(0.8, 1); // Harder distortion for EDM
             Tone.Transport.bpm.rampTo(135 + Math.random() * 10, 2);
+            this.reverb.decay = 2; // Short reverb for clarity
+            this.delay.delayTime.value = "16n"; // Fast delay
+        } else if (this.beatMode === 'house') {
+            this.dist.wet.rampTo(0.3, 1); // Mild distortion
+            Tone.Transport.bpm.rampTo(122 + Math.random() * 6, 3); // House tempo (122-128)
+            this.reverb.decay = 4; // Medium reverb
+            this.delay.delayTime.value = "8n"; // Classic house delay
         } else if (this.beatMode === 'choral' || this.beatMode === 'tumbling') {
             this.dist.wet.rampTo(0.0, 1);
             Tone.Transport.bpm.rampTo(80, 5);
-        } else {
-            this.dist.wet.rampTo(0.2, 1); // Mild grit
+            this.reverb.decay = 12; // Long, spacious reverb
+            this.delay.delayTime.value = "4n"; // Slow delay
+        } else if (this.beatMode === 'exotic_groove') {
+            this.dist.wet.rampTo(0.1, 1); // Clean
+            Tone.Transport.bpm.rampTo(95 + Math.random() * 10, 4); // Slower groove (95-105)
+            this.reverb.decay = 5; // Medium-long reverb
+            this.delay.delayTime.value = "8n.";
+        } else { // ambient
+            this.dist.wet.rampTo(0.0, 1);
             Tone.Transport.bpm.rampTo(110, 4);
+            this.reverb.decay = 8; // Spacious ambient reverb
+            this.delay.delayTime.value = "4n";
         }
     }
 
@@ -581,12 +614,14 @@ export class KaleidoscopeAudio {
 
     triggerCollisionSound(velocity) {
         if (!this.isInitialized || !this.isPlaying) return;
-        if (Math.random() > 0.8) return;
+
+        // FIXED: Removed 80% probability gate - let main.js handle filtering via velocity threshold
+        // Only skip if velocity is truly negligible
+        if (velocity < 0.003) return;
 
         if (this.glass) {
             const scale = this.scales[this.currentScaleName];
             if (!scale) return;
-            // Removed velocity check, rely on main.js calling this with valid velocity
             const noteIndex = Math.floor(Math.random() * scale.length);
             const note = scale[noteIndex];
             // Boost velocity slightly for audibility
@@ -627,16 +662,32 @@ export class KaleidoscopeAudio {
 
                 this.intensity = 0.3 + Math.random() * 0.4;
 
-                // Force param update immediately
+                // Force param update immediately (ENHANCED: Apply same adaptive settings)
                 if (this.beatMode === 'algorave') {
-                    this.dist.wet.rampTo(0.6, 1);
+                    this.dist.wet.rampTo(0.8, 1);
                     Tone.Transport.bpm.rampTo(135 + Math.random() * 10, 2);
+                    this.reverb.decay = 2;
+                    this.delay.delayTime.value = "16n";
+                } else if (this.beatMode === 'house') {
+                    this.dist.wet.rampTo(0.3, 1);
+                    Tone.Transport.bpm.rampTo(122 + Math.random() * 6, 3);
+                    this.reverb.decay = 4;
+                    this.delay.delayTime.value = "8n";
                 } else if (this.beatMode === 'choral' || this.beatMode === 'tumbling') {
                     this.dist.wet.rampTo(0.0, 1);
                     Tone.Transport.bpm.rampTo(80, 5);
-                } else {
+                    this.reverb.decay = 12;
+                    this.delay.delayTime.value = "4n";
+                } else if (this.beatMode === 'exotic_groove') {
+                    this.dist.wet.rampTo(0.1, 1);
+                    Tone.Transport.bpm.rampTo(95 + Math.random() * 10, 4);
+                    this.reverb.decay = 5;
+                    this.delay.delayTime.value = "8n.";
+                } else { // ambient
                     this.dist.wet.rampTo(0.0, 1);
                     Tone.Transport.bpm.rampTo(110, 4);
+                    this.reverb.decay = 8;
+                    this.delay.delayTime.value = "4n";
                 }
 
                 console.log(`Audio Reset Complete. New Mode: ${this.beatMode}, Scale: ${this.currentScaleName}`);

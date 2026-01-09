@@ -32,7 +32,8 @@ const uniforms = {
     uSegments: { value: 8.0 },
     uAngle: { value: 0.0 },
     uZoom: { value: 1.0 },
-    uTime: { value: 0.0 }
+    uTime: { value: 0.0 },
+    uKaleidoSpin: { value: 0.0 } // Independent kaleidoscope rotation
 };
 
 const material = new THREE.ShaderMaterial({
@@ -49,11 +50,14 @@ const composer = new EffectComposer(renderer);
 const renderPass = new RenderPass(scene, camera);
 composer.addPass(renderPass);
 
-const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
-bloomPass.threshold = 0.2;
-bloomPass.strength = 0.8; // Glow strength
-bloomPass.radius = 0.5;
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.6, 0.85);
+bloomPass.threshold = 0.3; // Raised to reduce excessive bloom (was 0.1)
+bloomPass.strength = 0.6; // Reduced intensity (was 1.5)
+bloomPass.radius = 0.6; // Moderate spread (was 0.8)
 composer.addPass(bloomPass);
+
+// Expose bloom for audio reactivity
+window.bloomPass = bloomPass;
 
 const outputPass = new OutputPass();
 composer.addPass(outputPass);
@@ -70,6 +74,27 @@ const IDLE_THRESHOLD = window.IDLE_THRESHOLD_OVERRIDE || 30.0; // Seconds
 // Expose for debugging
 window.chamber = chamber;
 
+// Hook for audio mode changes to trigger camera randomization
+window.onAudioModeChange = (newMode) => {
+    // When audio mode changes, consider changing camera too (50% chance)
+    if (Math.random() < 0.5) {
+        const modes = ['inside', 'orbital', 'drift', 'figure8', 'follow'];
+        const newCameraMode = modes[Math.floor(Math.random() * modes.length)];
+        chamber.setCameraMode(newCameraMode);
+
+        // Update dropdown
+        if (selectCamera) {
+            selectCamera.value = newCameraMode;
+        }
+
+        console.log(`Audio mode changed to ${newMode} - Camera mode: ${newCameraMode}`);
+        updateStatusDisplay();
+    }
+
+    // Flash status panel to show the change
+    flashStatusPanel();
+};
+
 // --- Audio Engine ---
 import { KaleidoscopeAudio } from './KaleidoscopeAudio.js';
 const audio = new KaleidoscopeAudio();
@@ -81,7 +106,49 @@ chamber.setAudio(audio);
 
 
 // --- UI Controls ---
-let btnBuild, inputSegments, inputCount, groupMirrors, groupCount, checkChamber, valueSegments, valueCount, instructions, speedSlider, valueSpeed;
+let btnBuild, inputSegments, inputCount, groupMirrors, groupCount, checkChamber, valueSegments, valueCount, instructions, speedSlider, valueSpeed, btnFullscreen, selectCamera;
+
+// Status update function
+function updateStatusDisplay() {
+    const themeEl = document.getElementById('status-theme');
+    if (themeEl && chamber && chamber.currentTheme) {
+        const themeName = chamber.currentTheme.charAt(0).toUpperCase() + chamber.currentTheme.slice(1);
+        themeEl.textContent = themeName;
+    }
+
+    // Update camera mode display
+    const cameraEl = document.getElementById('status-camera');
+    if (cameraEl && chamber && chamber.cameraMode) {
+        const cameraName = chamber.cameraMode.charAt(0).toUpperCase() + chamber.cameraMode.slice(1);
+        cameraEl.textContent = cameraName;
+    }
+
+    // Update audio status (show whether playing or not)
+    const modeEl = document.getElementById('status-mode');
+    const scaleEl = document.getElementById('status-scale');
+    const tempoEl = document.getElementById('status-tempo');
+
+    if (audio && audio.isInitialized) {
+        if (audio.isPlaying) {
+            if (modeEl) {
+                const modeName = audio.beatMode.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                modeEl.textContent = modeName;
+            }
+            if (scaleEl) scaleEl.textContent = audio.currentScaleName;
+            if (tempoEl && window.Tone) tempoEl.textContent = `${Math.round(Tone.Transport.bpm.value)} BPM`;
+        } else {
+            // Audio initialized but not playing
+            if (modeEl) modeEl.textContent = 'Stopped';
+            if (scaleEl) scaleEl.textContent = '—';
+            if (tempoEl) tempoEl.textContent = '—';
+        }
+    } else {
+        // Audio not initialized yet
+        if (modeEl) modeEl.textContent = 'Not Started';
+        if (scaleEl) scaleEl.textContent = '—';
+        if (tempoEl) tempoEl.textContent = '—';
+    }
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     btnBuild = document.getElementById('btn-build');
@@ -97,6 +164,9 @@ document.addEventListener('DOMContentLoaded', () => {
     speedSlider = document.getElementById('speedSlider');
     valueSpeed = document.getElementById('value-speed');
 
+    // Initialize status display on load
+    updateStatusDisplay();
+
     btnAudio = document.getElementById('btn-audio');
     if (btnAudio) {
         btnAudio.addEventListener('click', async () => {
@@ -105,10 +175,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 audio.start();
                 btnAudio.innerHTML = '<span class="icon">🔇</span> Stop Audio';
                 btnAudio.classList.add('active');
+                // Update status display after a short delay to ensure audio is fully started
+                setTimeout(() => {
+                    updateStatusDisplay();
+                }, 100);
             } else {
                 audio.stop();
                 btnAudio.innerHTML = '<span class="icon">🔊</span> Start Audio';
                 btnAudio.classList.remove('active');
+                // Update status display immediately after stopping audio
+                updateStatusDisplay();
+            }
+        });
+    }
+
+    // Fullscreen button
+    btnFullscreen = document.getElementById('btn-fullscreen');
+    if (btnFullscreen) {
+        btnFullscreen.addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                document.exitFullscreen();
             }
         });
     }
@@ -118,7 +206,22 @@ document.addEventListener('DOMContentLoaded', () => {
             // Pass current count value if in chamber mode, else undefined (random)
             const count = checkChamber.checked ? parseInt(inputCount.value) : undefined;
             chamber.buildNew(count);
+
+            // Randomize camera mode with new build
+            const modes = ['inside', 'orbital', 'drift', 'figure8', 'follow'];
+            const newMode = modes[Math.floor(Math.random() * modes.length)];
+            chamber.setCameraMode(newMode);
+
+            // Update dropdown
+            if (selectCamera) {
+                selectCamera.value = newMode;
+            }
+
+            console.log("Build New Scope - Camera mode:", newMode);
+
             lastInteractionTime = clock.getElapsedTime();
+            updateStatusDisplay(); // Update theme and camera immediately
+            flashStatusPanel(); // Show status panel briefly
         });
     }
 
@@ -168,6 +271,19 @@ document.addEventListener('DOMContentLoaded', () => {
             lastInteractionTime = clock.getElapsedTime();
         });
     }
+
+    // Camera mode selector
+    selectCamera = document.getElementById('select-camera');
+    if (selectCamera) {
+        // Set initial value
+        selectCamera.value = chamber.cameraMode;
+
+        selectCamera.addEventListener('change', (e) => {
+            chamber.setCameraMode(e.target.value);
+            updateStatusDisplay();
+            lastInteractionTime = clock.getElapsedTime();
+        });
+    }
 });
 
 // --- Input Handling ---
@@ -212,8 +328,8 @@ const onMove = (x, y) => {
     const sensitivity = 0.005;
     uniforms.uAngle.value -= deltaX * sensitivity;
 
-    // Add some "velocity" for inertia
-    targetRotationVelocity = -deltaX * sensitivity;
+    // Add some "velocity" for inertia (increased multiplier for more momentum)
+    targetRotationVelocity = -deltaX * sensitivity * 1.5;
 
     lastMouseX = x;
     lastMouseY = y;
@@ -248,6 +364,43 @@ container.addEventListener('wheel', (e) => {
     // inputZoom.value = newZoom; // Sync UI
 }, { passive: false });
 
+// Pinch-to-zoom for mobile
+let initialPinchDistance = null;
+let initialZoom = 1.0;
+
+container.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 2) {
+        const touch1 = e.touches[0];
+        const touch2 = e.touches[1];
+        initialPinchDistance = Math.hypot(
+            touch2.clientX - touch1.clientX,
+            touch2.clientY - touch1.clientY
+        );
+        initialZoom = uniforms.uZoom.value;
+    }
+}, { passive: true });
+
+container.addEventListener('touchmove', (e) => {
+    if (e.touches.length === 2) {
+        e.preventDefault();
+        const touch1 = e.touches[0];
+        const touch2 = e.touches[1];
+        const currentDistance = Math.hypot(
+            touch2.clientX - touch1.clientX,
+            touch2.clientY - touch1.clientY
+        );
+        const scale = currentDistance / initialPinchDistance;
+        let newZoom = initialZoom * scale;
+        newZoom = Math.max(0.5, Math.min(3.0, newZoom));
+        uniforms.uZoom.value = newZoom;
+        lastInteractionTime = clock.getElapsedTime();
+    }
+}, { passive: false });
+
+container.addEventListener('touchend', () => {
+    initialPinchDistance = null;
+}, { passive: true });
+
 
 // --- UI Inactivity Fade ---
 let inactivityTimer;
@@ -272,6 +425,20 @@ function resetInactivityTimer() {
     }, 5000);
 }
 
+// Flash just the status panel when mood/theme changes
+function flashStatusPanel() {
+    const statusPanel = document.querySelector('.status-panel');
+    if (!statusPanel) return;
+
+    // Show status panel
+    statusPanel.classList.remove('ui-hidden');
+
+    // Hide it after 3 seconds
+    setTimeout(() => {
+        statusPanel.classList.add('ui-hidden');
+    }, 3000);
+}
+
 // Initialize timer
 resetInactivityTimer();
 
@@ -281,6 +448,31 @@ window.addEventListener('mousedown', resetInactivityTimer);
 window.addEventListener('touchstart', resetInactivityTimer);
 window.addEventListener('wheel', resetInactivityTimer);
 window.addEventListener('keydown', resetInactivityTimer);
+
+// Keyboard shortcuts
+window.addEventListener('keydown', (e) => {
+    // Don't trigger if typing in input
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+
+    switch(e.key.toLowerCase()) {
+        case ' ':
+            e.preventDefault();
+            if (btnBuild) btnBuild.click();
+            break;
+        case 'a':
+            e.preventDefault();
+            if (btnAudio) btnAudio.click();
+            break;
+        case 'f':
+            e.preventDefault();
+            if (btnFullscreen) btnFullscreen.click();
+            break;
+        case 'c':
+            e.preventDefault();
+            if (checkChamber) checkChamber.click();
+            break;
+    }
+});
 
 
 // --- Animation Loop ---
@@ -301,6 +493,16 @@ function animate() {
     // Update Audio
     if (audio.isPlaying) {
         audio.updateParams(speedMult, chamber.currentTheme);
+
+        // Audio-reactive bloom (reduced range)
+        const energy = audio.getEnergy();
+        bloomPass.strength = 0.6 + energy * 0.6; // 0.6 to 1.2 (was 1.5 to 3.0)
+        bloomPass.radius = 0.6 + energy * 0.3;   // 0.6 to 0.9 (was 0.8 to 1.2)
+    }
+
+    // Update status display every second
+    if (Math.floor(time) !== Math.floor(time - delta)) {
+        updateStatusDisplay();
     }
 
     // Idle Animation Logic
@@ -370,6 +572,24 @@ function animate() {
             } else {
                 chamber.removeRandomObject();
             }
+
+            // Occasionally change camera during idle drift (every ~20 seconds)
+            if (Math.floor(time * 0.05) > Math.floor((time - delta) * 0.05)) {
+                if (Math.random() < 0.3) { // 30% chance
+                    const modes = ['inside', 'orbital', 'drift', 'figure8', 'follow'];
+                    const newMode = modes[Math.floor(Math.random() * modes.length)];
+                    chamber.setCameraMode(newMode);
+
+                    // Update dropdown
+                    if (selectCamera) {
+                        selectCamera.value = newMode;
+                    }
+
+                    updateStatusDisplay();
+                    flashStatusPanel(); // Show status panel briefly
+                    console.log("Idle camera shift:", newMode);
+                }
+            }
         }
 
         // --- Major Idle Reset (User Request) ---
@@ -396,15 +616,29 @@ function animate() {
             if (inputSegments) inputSegments.value = newSegments;
             if (valueSegments) valueSegments.innerText = newSegments;
 
-            // 3. Reset Timer
+            // 4. Change camera mode (experimental!)
+            const modes = ['inside', 'orbital', 'drift', 'figure8', 'follow'];
+            const newMode = modes[Math.floor(Math.random() * modes.length)];
+            chamber.setCameraMode(newMode);
+
+            // Update dropdown
+            if (selectCamera) {
+                selectCamera.value = newMode;
+            }
+
+            updateStatusDisplay();
+            flashStatusPanel(); // Show status panel briefly
+            console.log("Camera mode switched to:", newMode);
+
+            // 5. Reset Timer
             window.lastMajorIdleTime = time;
             window.nextMajorIdleInterval = 30 + Math.random() * 90; // new random interval
         }
 
     } else if (!isDragging) {
-        // Normal Inertia
-        // Decay velocity
-        targetRotationVelocity *= 0.95;
+        // Normal Inertia (slower decay for longer rotation)
+        // Decay velocity - reduced from 0.95 to 0.98 for slower deceleration
+        targetRotationVelocity *= 0.98;
         uniforms.uAngle.value += targetRotationVelocity * speedMult;
     }
 
@@ -416,6 +650,9 @@ function animate() {
 
     // Update Uniforms
     uniforms.uTime.value = time;
+
+    // Independent kaleidoscope rotation (very slow, continuous)
+    uniforms.uKaleidoSpin.value = time * 0.05;
 
     // Render Main Scene
     if (checkChamber && checkChamber.checked) {
