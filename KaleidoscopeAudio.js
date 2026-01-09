@@ -389,18 +389,24 @@ export class KaleidoscopeAudio {
                     // Sort by offset time (CRITICAL FIX for Monophonic Synth)
                     events.sort((a, b) => a.offset - b.offset);
 
+                    // Track last scheduled time for monophonic hihat
+                    let lastHihatTime = Math.max(time, Tone.now());
+
                     events.forEach(ev => {
                         // Ensure scheduling time is always in the future
-                        const scheduleTime = Math.max(time + ev.offset, Tone.now() + 0.001);
+                        const baseScheduleTime = Math.max(time + ev.offset, Tone.now() + 0.001);
 
-                        // 1. Tonal Body (Glass Synth - Poly, so order less critical)
+                        // 1. Tonal Body (Glass Synth - Poly, can overlap)
                         // Randomly shift up an octave for sparkles
                         const playNote = (Math.random() > 0.5) ? Tone.Frequency(ev.note).transpose(12) : ev.note;
-                        this.glass.triggerAttackRelease(playNote, "16n", scheduleTime, ev.vel);
+                        this.glass.triggerAttackRelease(playNote, "16n", baseScheduleTime, ev.vel);
 
-                        // 2. Metallic Transient (HiHat - Monophonic, MUST be ordered)
+                        // 2. Metallic Transient (HiHat - Monophonic, needs strictly increasing times)
                         if (this.hihat) {
-                            this.hihat.triggerAttackRelease(2000 + Math.random() * 3000, "64n", scheduleTime, ev.vel * 0.7);
+                            // Ensure each hihat trigger is strictly after the previous one
+                            const hihatTime = Math.max(baseScheduleTime, lastHihatTime + 0.001);
+                            this.hihat.triggerAttackRelease(2000 + Math.random() * 3000, "64n", hihatTime, ev.vel * 0.7);
+                            lastHihatTime = hihatTime;
                         }
                     });
                 }
