@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { kaleidoscopeVertexShader, kaleidoscopeFragmentShader } from './kaleidoscopeShader.js';
-import { ObjectChamber } from './ObjectChamber.js?v=100';
+import { ObjectChamber } from './ObjectChamber.js?v=101';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';

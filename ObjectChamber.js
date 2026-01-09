@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ArtisanObjects } from './ArtisanObjects.js?v=2';
+import { ArtisanObjects } from './ArtisanObjects.js?v=3';
 
 export class ObjectChamber {
     constructor(renderer, width, height) {
@@ -122,7 +122,7 @@ export class ObjectChamber {
         this.objects = [];
 
         // Select a Theme
-        const themes = ['christmas', 'halloween', 'industrial', 'fruity', 'gemstone'];
+        const themes = ['christmas', 'halloween', 'industrial', 'fruity', 'gemstone', 'aquarium', 'outer-space', 'microscopic', 'feline'];
         this.currentTheme = themes[Math.floor(Math.random() * themes.length)]; // Store on instance
         const theme = this.currentTheme;
         console.log('Selected Theme:', theme);
@@ -161,6 +161,41 @@ export class ObjectChamber {
                 else if (type < 0.6) mesh = ArtisanObjects.createFruit('grape', scale);
                 else if (type < 0.8) mesh = ArtisanObjects.createBead(scale, color);
                 else mesh = this.createStandardGem(scale, color);
+            }
+            else if (theme === 'aquarium') {
+                if (type < 0.15) mesh = ArtisanObjects.createFish('tropical', scale, color);
+                else if (type < 0.3) mesh = ArtisanObjects.createJellyfish(scale, color);
+                else if (type < 0.4) mesh = ArtisanObjects.createSeahorse(scale, color);
+                else if (type < 0.55) mesh = ArtisanObjects.createShell(Math.random() < 0.5 ? 'spiral' : 'scallop', scale, color);
+                else if (type < 0.7) mesh = ArtisanObjects.createStarfish(scale, color);
+                else if (type < 0.85) mesh = ArtisanObjects.createCoral(scale, color);
+                else mesh = this.createStandardGem(scale, color); // Bubbles/gems
+            }
+            else if (theme === 'outer-space') {
+                if (type < 0.2) mesh = ArtisanObjects.createPlanet('rocky', scale, color);
+                else if (type < 0.35) mesh = ArtisanObjects.createPlanet('cratered', scale * 0.8, color);
+                else if (type < 0.45) mesh = ArtisanObjects.createPlanet('ringed', scale, color);
+                else if (type < 0.6) mesh = ArtisanObjects.createAsteroid(scale, color);
+                else if (type < 0.75) mesh = ArtisanObjects.createComet(scale, color);
+                else if (type < 0.9) mesh = ArtisanObjects.createSpaceStar(5, scale * 0.6, color);
+                else mesh = this.createStandardGem(scale, color); // Crystals/minerals
+            }
+            else if (theme === 'microscopic') {
+                if (type < 0.2) mesh = ArtisanObjects.createCell(scale, color);
+                else if (type < 0.4) mesh = ArtisanObjects.createBacteria('rod', scale, color);
+                else if (type < 0.5) mesh = ArtisanObjects.createBacteria('spiral', scale, color);
+                else if (type < 0.6) mesh = ArtisanObjects.createBacteria('sphere', scale, color);
+                else if (type < 0.75) mesh = ArtisanObjects.createVirus(scale, color);
+                else if (type < 0.85) mesh = ArtisanObjects.createDNA(scale, color, this.getThemeColor(theme));
+                else mesh = ArtisanObjects.createDiatom(scale, color);
+            }
+            else if (theme === 'feline') {
+                if (type < 0.25) mesh = ArtisanObjects.createCatHead(scale, color);
+                else if (type < 0.45) mesh = ArtisanObjects.createYarnBall(scale, color);
+                else if (type < 0.6) mesh = ArtisanObjects.createPaw(scale, color);
+                else if (type < 0.75) mesh = ArtisanObjects.createMouseToy(scale, color);
+                else if (type < 0.85) mesh = ArtisanObjects.createFish('tropical', scale * 0.8, color); // Cat toy fish
+                else mesh = this.createStandardGem(scale, color); // Cat toys / bells
             }
             else { // Gemstone / Default
                 if (type < 0.1) mesh = ArtisanObjects.createCharm('diamond', scale, color);
@@ -224,6 +259,22 @@ export class ObjectChamber {
         } else if (theme === 'fruity') {
             // Super vibrant fruits
             return new THREE.Color().setHSL(Math.random(), 1.0, 0.6);
+        } else if (theme === 'aquarium') {
+            // Ocean blues, corals, tropical fish colors
+            const palette = [0x00bfff, 0xff6b9d, 0xffa500, 0x7fffd4, 0xff00ff, 0x00ff7f, 0xffe4b5];
+            return new THREE.Color(palette[Math.floor(Math.random() * palette.length)]);
+        } else if (theme === 'outer-space') {
+            // Deep space: blues, purples, oranges, grays
+            const palette = [0x4169e1, 0x8b00ff, 0xff4500, 0xc0c0c0, 0xffd700, 0xff69b4, 0x1e90ff];
+            return new THREE.Color(palette[Math.floor(Math.random() * palette.length)]);
+        } else if (theme === 'microscopic') {
+            // Scientific stain colors: greens, blues, purples, pinks
+            const palette = [0x00ff88, 0x0088ff, 0xff00aa, 0xffff00, 0xff8800, 0x88ffbb, 0xff0066];
+            return new THREE.Color(palette[Math.floor(Math.random() * palette.length)]);
+        } else if (theme === 'feline') {
+            // Cat colors: oranges, grays, whites, pinks, with yarn colors
+            const palette = [0xff8844, 0xcccccc, 0xffffff, 0xffaacc, 0xff00ff, 0x00ffff, 0xffff00];
+            return new THREE.Color(palette[Math.floor(Math.random() * palette.length)]);
         } else {
             // Gemstone / Default - Max saturation
             return new THREE.Color().setHSL(Math.random(), 1.0, 0.5);
@@ -416,6 +467,41 @@ export class ObjectChamber {
             if (type < 0.3) mesh = ArtisanObjects.createFruit('cherry', scale);
             else if (type < 0.6) mesh = ArtisanObjects.createFruit('grape', scale);
             else if (type < 0.8) mesh = ArtisanObjects.createBead(scale, color);
+            else mesh = this.createStandardGem(scale, color);
+        }
+        else if (theme === 'aquarium') {
+            if (type < 0.15) mesh = ArtisanObjects.createFish('tropical', scale, color);
+            else if (type < 0.3) mesh = ArtisanObjects.createJellyfish(scale, color);
+            else if (type < 0.4) mesh = ArtisanObjects.createSeahorse(scale, color);
+            else if (type < 0.55) mesh = ArtisanObjects.createShell(Math.random() < 0.5 ? 'spiral' : 'scallop', scale, color);
+            else if (type < 0.7) mesh = ArtisanObjects.createStarfish(scale, color);
+            else if (type < 0.85) mesh = ArtisanObjects.createCoral(scale, color);
+            else mesh = this.createStandardGem(scale, color);
+        }
+        else if (theme === 'outer-space') {
+            if (type < 0.2) mesh = ArtisanObjects.createPlanet('rocky', scale, color);
+            else if (type < 0.35) mesh = ArtisanObjects.createPlanet('cratered', scale * 0.8, color);
+            else if (type < 0.45) mesh = ArtisanObjects.createPlanet('ringed', scale, color);
+            else if (type < 0.6) mesh = ArtisanObjects.createAsteroid(scale, color);
+            else if (type < 0.75) mesh = ArtisanObjects.createComet(scale, color);
+            else if (type < 0.9) mesh = ArtisanObjects.createSpaceStar(5, scale * 0.6, color);
+            else mesh = this.createStandardGem(scale, color);
+        }
+        else if (theme === 'microscopic') {
+            if (type < 0.2) mesh = ArtisanObjects.createCell(scale, color);
+            else if (type < 0.4) mesh = ArtisanObjects.createBacteria('rod', scale, color);
+            else if (type < 0.5) mesh = ArtisanObjects.createBacteria('spiral', scale, color);
+            else if (type < 0.6) mesh = ArtisanObjects.createBacteria('sphere', scale, color);
+            else if (type < 0.75) mesh = ArtisanObjects.createVirus(scale, color);
+            else if (type < 0.85) mesh = ArtisanObjects.createDNA(scale, color, this.getThemeColor(theme));
+            else mesh = ArtisanObjects.createDiatom(scale, color);
+        }
+        else if (theme === 'feline') {
+            if (type < 0.25) mesh = ArtisanObjects.createCatHead(scale, color);
+            else if (type < 0.45) mesh = ArtisanObjects.createYarnBall(scale, color);
+            else if (type < 0.6) mesh = ArtisanObjects.createPaw(scale, color);
+            else if (type < 0.75) mesh = ArtisanObjects.createMouseToy(scale, color);
+            else if (type < 0.85) mesh = ArtisanObjects.createFish('tropical', scale * 0.8, color);
             else mesh = this.createStandardGem(scale, color);
         }
         else { // Gemstone / Default
