@@ -86,10 +86,10 @@ export class ObjectChamber {
         this.buildNew();
     }
 
-    updateEnvironment(hue = 0.5, intensity = 1.0) {
+    updateEnvironment(hue = 0.5, intensity = 1.0, saturation = 0.8, lightness = 0.25) {
         // Create a simple scene to render as env map
         const envScene = new THREE.Scene();
-        envScene.background = new THREE.Color().setHSL(hue, 0.6, 0.1 * intensity);
+        envScene.background = new THREE.Color().setHSL(hue, saturation * 0.8, lightness * 1.5 * intensity);
 
         // Add some bright "lights" (meshes) to the env scene to create reflections
         const geometry = new THREE.IcosahedronGeometry(1, 1);
@@ -107,7 +107,7 @@ export class ObjectChamber {
 
         const envMap = this.pmremGenerator.fromScene(envScene).texture;
         this.scene.environment = envMap;
-        this.scene.background = new THREE.Color().setHSL(hue, 0.4, 0.02 * intensity); // Darker background for contrast
+        this.scene.background = new THREE.Color().setHSL(hue, saturation, lightness * intensity);
 
         // Update backlight color too
         this.backlight.color.setHSL(hue, 0.5, 0.9);
@@ -243,6 +243,50 @@ export class ObjectChamber {
             this.group.add(mesh);
             this.objects.push(mesh);
         }
+
+        // Set colorful but dark background based on theme
+        let bgHue, bgSat, bgLight;
+
+        if (theme === 'aquarium') {
+            bgHue = 0.52 + (Math.random() - 0.5) * 0.1; // Blue-cyan
+            bgSat = 0.8 + Math.random() * 0.2;
+            bgLight = 0.05 + Math.random() * 0.08; // 0.05-0.13
+        } else if (theme === 'outer-space') {
+            bgHue = Math.random() < 0.5 ? 0.65 : 0.75; // Purple or deep blue
+            bgSat = 0.7 + Math.random() * 0.3;
+            bgLight = 0.02 + Math.random() * 0.06; // 0.02-0.08 (very dark for space)
+        } else if (theme === 'microscopic') {
+            bgHue = Math.random(); // Full spectrum like microscope slides
+            bgSat = 0.9 + Math.random() * 0.1;
+            bgLight = 0.08 + Math.random() * 0.10; // 0.08-0.18
+        } else if (theme === 'feline') {
+            bgHue = 0.85 + (Math.random() - 0.5) * 0.15; // Pink-magenta
+            bgSat = 0.6 + Math.random() * 0.3;
+            bgLight = 0.08 + Math.random() * 0.10; // 0.08-0.18
+        } else if (theme === 'christmas') {
+            bgHue = Math.random() < 0.5 ? 0.0 : 0.33; // Red or green
+            bgSat = 0.9;
+            bgLight = 0.06 + Math.random() * 0.10; // 0.06-0.16
+        } else if (theme === 'halloween') {
+            bgHue = 0.08 + (Math.random() - 0.5) * 0.05; // Orange
+            bgSat = 0.95;
+            bgLight = 0.05 + Math.random() * 0.08; // 0.05-0.13
+        } else if (theme === 'industrial') {
+            bgHue = 0.1 + (Math.random() - 0.5) * 0.1; // Orange-rust
+            bgSat = 0.4 + Math.random() * 0.3; // Lower saturation
+            bgLight = 0.04 + Math.random() * 0.10; // 0.04-0.14
+        } else if (theme === 'fruity') {
+            bgHue = Math.random(); // Rainbow
+            bgSat = 1.0;
+            bgLight = 0.10 + Math.random() * 0.12; // 0.10-0.22 (still brightest)
+        } else {
+            // Gemstone - vibrant rainbow
+            bgHue = Math.random();
+            bgSat = 0.9 + Math.random() * 0.1;
+            bgLight = 0.06 + Math.random() * 0.12; // 0.06-0.18
+        }
+
+        this.updateEnvironment(bgHue, 1.0, bgSat, bgLight);
     }
 
     getThemeColor(theme) {
