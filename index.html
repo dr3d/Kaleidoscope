@@ -371,7 +371,7 @@
             outline-offset: 4px;
         }
 
-        .switch input:focus + .slider {
+        .switch input:focus+.slider {
             box-shadow: 0 0 0 2px var(--accent-color);
         }
 
@@ -433,10 +433,7 @@
                 <span class="status-label">Theme</span>
                 <span class="status-value" id="status-theme">Gemstone</span>
             </div>
-            <div class="status-item">
-                <span class="status-label">Camera</span>
-                <span class="status-value" id="status-camera">Inside</span>
-            </div>
+
             <div class="status-item">
                 <span class="status-label">Audio Mode</span>
                 <span class="status-value" id="status-mode">—</span>
@@ -452,35 +449,38 @@
         </div>
 
         <div class="controls ui-fade">
-            <button id="btn-build" class="btn-primary" title="Build new scope (Space)" aria-label="Build new kaleidoscope with random objects">
+            <button id="btn-build" class="btn-primary" title="Build new scope (Space)"
+                aria-label="Build new kaleidoscope with random objects">
                 <span class="icon" aria-hidden="true">✨</span> Build New Scope
             </button>
 
-            <button id="btn-audio" class="btn-primary" style="margin-right: 1rem;" title="Toggle audio (A)" aria-label="Toggle generative audio">
+            <button id="btn-audio" class="btn-primary" style="margin-right: 1rem;" title="Toggle audio (A)"
+                aria-label="Toggle generative audio">
                 <span class="icon" aria-hidden="true">🔊</span> Start Audio
             </button>
 
-            <button id="btn-fullscreen" class="btn-icon" title="Toggle fullscreen (F)" aria-label="Toggle fullscreen mode">
+            <button id="btn-fullscreen" class="btn-icon" title="Toggle fullscreen (F)"
+                aria-label="Toggle fullscreen mode">
                 <span class="icon" aria-hidden="true">⛶</span>
             </button>
 
             <div class="control-group">
                 <label for="speedSlider">Speed</label>
-                <input type="range" id="speedSlider" min="1" max="40" step="1" value="10"
-                       aria-label="Animation speed" aria-valuemin="1" aria-valuemax="40" aria-valuenow="10">
+                <input type="range" id="speedSlider" min="1" max="40" step="1" value="10" aria-label="Animation speed"
+                    aria-valuemin="1" aria-valuemax="40" aria-valuenow="10">
                 <span id="value-speed" style="min-width: 20px; text-align: right;" aria-live="polite">10</span>
             </div>
 
             <div id="group-mirrors" class="control-group">
                 <label for="input-segments">Mirrors</label>
                 <input type="range" id="input-segments" min="4" max="16" step="1" value="8"
-                       aria-label="Number of mirror segments" aria-valuemin="4" aria-valuemax="16" aria-valuenow="8">
+                    aria-label="Number of mirror segments" aria-valuemin="4" aria-valuemax="16" aria-valuenow="8">
                 <span id="value-segments" style="min-width: 20px; text-align: right;" aria-live="polite">8</span>
             </div>
 
             <div id="group-count" class="control-group" style="display: none;">
                 <label>Items</label>
-                <input type="range" id="input-count" min="10" max="100" step="1" value="50">
+                <input type="range" id="input-count" min="10" max="160" step="1" value="50">
                 <span id="value-count" style="min-width: 30px; text-align: right;">50</span>
             </div>
 

@@ -87,33 +87,45 @@ window.onAudioModeChange = (newMode) => {
             selectCamera.value = newCameraMode;
         }
 
-        console.log(`Audio mode changed to ${newMode} - Camera mode: ${newCameraMode}`);
+        // Randomize Mirrors (Segments) - range 4 to 16
+        const newSegments = 4 + Math.floor(Math.random() * 13);
+        uniforms.uSegments.value = newSegments;
+        // Update UI if available
+        if (inputSegments) inputSegments.value = newSegments;
+        if (valueSegments) valueSegments.innerText = newSegments;
+
+        console.log(`Audio mode changed to ${newMode} - Camera: ${newCameraMode}, Segments: ${newSegments}`);
         updateStatusDisplay();
-    }
 
-    // Flash status panel to show the change
-    flashStatusPanel();
+        // Flash status panel to show the change
+        flashStatusPanel();
 
-    // Randomize Speed Slider (if not manually locked - assuming fully random for now)
-    // Speed slider range is typically 0 to 100 or similar (HTML default is 0-100 if not specified, usually mapped to 0-10)
-    // Assuming 10 to 50 as a reasonable random range
-    if (speedSlider) {
-        // Random speed between 0.5 (5) and 4.0 (40)
-        const randomSpeed = 5 + Math.floor(Math.random() * 35);
-        speedSlider.value = randomSpeed;
-        if (valueSpeed) valueSpeed.innerText = randomSpeed;
+        // Randomize Speed Slider (if not manually locked - assuming fully random for now)
+        // Speed slider range is typically 0 to 100 or similar (HTML default is 0-100 if not specified, usually mapped to 0-10)
+        // Assuming 10 to 50 as a reasonable random range
+        if (speedSlider) {
+            // Random speed between 0.5 (5) and 4.0 (40)
+            const randomSpeed = 5 + Math.floor(Math.random() * 35);
+            speedSlider.value = randomSpeed;
+            if (valueSpeed) valueSpeed.innerText = randomSpeed;
 
-        // Ensure the animation loop picks it up immediately reset time logic if needed
-        lastInteractionTime = clock.getElapsedTime();
-    }
+            // Ensure the animation loop picks it up immediately reset time logic if needed
+            lastInteractionTime = clock.getElapsedTime();
+        }
 
-    // Randomize Theme (Rebuild Chamber)
-    // This syncs the visual theme with the new audio mood
-    const count = checkChamber.checked ? parseInt(inputCount.value) : undefined;
-    chamber.buildNew(count);
+        // Randomize Theme (Rebuild Chamber)
+        // This syncs the visual theme with the new audio mood
+        const count = checkChamber.checked ? parseInt(inputCount.value) : undefined;
+        chamber.buildNew(count);
+        // Update item count slider if random
+        if (inputCount && chamber.objects) {
+            inputCount.value = chamber.objects.length;
+            if (valueCount) valueCount.innerText = chamber.objects.length;
+        }
 
-    // Update status display to show new theme immediately
-    updateStatusDisplay();
+        // Update status display to show new theme immediately
+        updateStatusDisplay();
+    };
 };
 
 // --- Audio Engine ---
@@ -137,12 +149,7 @@ function updateStatusDisplay() {
         themeEl.textContent = themeName;
     }
 
-    // Update camera mode display
-    const cameraEl = document.getElementById('status-camera');
-    if (cameraEl && chamber && chamber.cameraMode) {
-        const cameraName = chamber.cameraMode.charAt(0).toUpperCase() + chamber.cameraMode.slice(1);
-        cameraEl.textContent = cameraName;
-    }
+
 
     // Update audio status (show whether playing or not)
     const modeEl = document.getElementById('status-mode');
@@ -228,6 +235,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const count = checkChamber.checked ? parseInt(inputCount.value) : undefined;
             chamber.buildNew(count);
 
+            // Update item count slider if random
+            if (!checkChamber.checked && inputCount && chamber.objects) {
+                inputCount.value = chamber.objects.length;
+                if (valueCount) valueCount.innerText = chamber.objects.length;
+            }
+
             // Randomize camera mode with new build
             const modes = ['inside', 'orbital', 'drift', 'figure8', 'follow'];
             const newMode = modes[Math.floor(Math.random() * modes.length)];
@@ -281,13 +294,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 groupMirrors.style.display = 'none';
                 groupCount.style.display = 'flex';
                 instructions.innerText = 'Drag to Rotate View • Scroll to Zoom';
-                // Build with current count immediately
-                chamber.buildNew(parseInt(inputCount.value));
             } else {
                 groupMirrors.style.display = 'flex';
                 groupCount.style.display = 'none';
                 instructions.innerText = 'Drag to Rotate & Color • Scroll to Zoom';
-                chamber.buildNew(); // Random count for kaleidoscope
             }
             lastInteractionTime = clock.getElapsedTime();
         });
@@ -625,6 +635,11 @@ function animate() {
 
             // 1. Rebuild Scope
             chamber.buildNew();
+            // Update item count slider
+            if (inputCount && chamber.objects) {
+                inputCount.value = chamber.objects.length;
+                if (valueCount) valueCount.innerText = chamber.objects.length;
+            }
 
             // 2. Reset Audio (Fade & Restart)
             if (audio && audio.isInitialized) {
