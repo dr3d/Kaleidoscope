@@ -31,24 +31,24 @@ export class ObjectChamber {
         // --- Lighting & Environment ---
 
         // 1. Backlight (The "Sun" at the end of the tube) - Reduced to prevent hot spot
-        this.backlight = new THREE.PointLight(0xffffff, 4.0, 20); // Reduced from 8.0
+        this.backlight = new THREE.PointLight(0xffffff, 3.0, 20); // Reduced from 8.0 to 4.0 then 3.0
         this.backlight.position.set(0, 0, -5); // Behind objects
         this.scene.add(this.backlight);
 
         // 2. Rim/Fill Lights
-        const rimLight = new THREE.SpotLight(0xffaa00, 5.0);
+        const rimLight = new THREE.SpotLight(0xffaa00, 3.75);
         rimLight.position.set(5, 5, 5);
         rimLight.lookAt(0, 0, 0);
         this.scene.add(rimLight);
 
-        const fillLight = new THREE.AmbientLight(0x404040, 2.0); // Higher ambient for glass
+        const fillLight = new THREE.AmbientLight(0x404040, 1.5); // Higher ambient for glass
         this.scene.add(fillLight);
 
         // 3. Multiple colored accent lights for more sparkle
         const accentColors = [0xff6b6b, 0x4ecdc4, 0xffe66d, 0xa8e6cf];
         this.accentLights = [];
         for (let i = 0; i < 4; i++) {
-            const accentLight = new THREE.PointLight(accentColors[i], 3.0, 15);
+            const accentLight = new THREE.PointLight(accentColors[i], 2.25, 15);
             const angle = (i / 4) * Math.PI * 2;
             accentLight.position.set(
                 Math.cos(angle) * 6,
@@ -111,7 +111,7 @@ export class ObjectChamber {
 
         // Update backlight color too
         this.backlight.color.setHSL(hue, 0.5, 0.9);
-        this.backlight.intensity = 5.0 * intensity;
+        this.backlight.intensity = 3.75 * intensity;
     }
 
     buildNew(count) {
@@ -286,7 +286,7 @@ export class ObjectChamber {
             bgLight = 0.06 + Math.random() * 0.12; // 0.06-0.18
         }
 
-        this.updateEnvironment(bgHue, 1.0, bgSat, bgLight);
+        this.updateEnvironment(bgHue, 0.75, bgSat, bgLight);
     }
 
     getThemeColor(theme) {
@@ -621,7 +621,7 @@ export class ObjectChamber {
         this.cameraTime += 0.016 * speed; // Approximate delta time
         const t = this.cameraTime;
 
-        switch(this.cameraMode) {
+        switch (this.cameraMode) {
             case 'static':
                 // Original static position
                 this.camera.position.set(0, 0, 7);

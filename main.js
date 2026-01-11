@@ -52,7 +52,7 @@ composer.addPass(renderPass);
 
 const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.6, 0.85);
 bloomPass.threshold = 0.3; // Raised to reduce excessive bloom (was 0.1)
-bloomPass.strength = 0.6; // Reduced intensity (was 1.5)
+bloomPass.strength = 0.45; // Reduced intensity (was 1.5, then 0.6)
 bloomPass.radius = 0.6; // Moderate spread (was 0.8)
 composer.addPass(bloomPass);
 
@@ -93,6 +93,27 @@ window.onAudioModeChange = (newMode) => {
 
     // Flash status panel to show the change
     flashStatusPanel();
+
+    // Randomize Speed Slider (if not manually locked - assuming fully random for now)
+    // Speed slider range is typically 0 to 100 or similar (HTML default is 0-100 if not specified, usually mapped to 0-10)
+    // Assuming 10 to 50 as a reasonable random range
+    if (speedSlider) {
+        // Random speed between 0.5 (5) and 4.0 (40)
+        const randomSpeed = 5 + Math.floor(Math.random() * 35);
+        speedSlider.value = randomSpeed;
+        if (valueSpeed) valueSpeed.innerText = randomSpeed;
+
+        // Ensure the animation loop picks it up immediately reset time logic if needed
+        lastInteractionTime = clock.getElapsedTime();
+    }
+
+    // Randomize Theme (Rebuild Chamber)
+    // This syncs the visual theme with the new audio mood
+    const count = checkChamber.checked ? parseInt(inputCount.value) : undefined;
+    chamber.buildNew(count);
+
+    // Update status display to show new theme immediately
+    updateStatusDisplay();
 };
 
 // --- Audio Engine ---
@@ -309,7 +330,7 @@ const onMove = (x, y) => {
     // Background Color Logic (Mouse Y)
     // Map Y to Hue (0-1) and Intensity (0.5 - 2.0)
     const hue = y / window.innerHeight;
-    const intensity = 0.5 + (1.0 - (y / window.innerHeight)) * 1.5; // Top is brighter
+    const intensity = (0.5 + (1.0 - (y / window.innerHeight)) * 1.5) * 0.75; // Top is brighter, 25% reduced
     chamber.updateEnvironment(hue, intensity);
 
     lastInteractionTime = clock.getElapsedTime();
@@ -454,7 +475,7 @@ window.addEventListener('keydown', (e) => {
     // Don't trigger if typing in input
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
 
-    switch(e.key.toLowerCase()) {
+    switch (e.key.toLowerCase()) {
         case ' ':
             e.preventDefault();
             if (btnBuild) btnBuild.click();
@@ -496,7 +517,7 @@ function animate() {
 
         // Audio-reactive bloom (reduced range)
         const energy = audio.getEnergy();
-        bloomPass.strength = 0.6 + energy * 0.6; // 0.6 to 1.2 (was 1.5 to 3.0)
+        bloomPass.strength = 0.45 + energy * 0.45; // 0.45 to 0.9 (was 0.6 to 1.2)
         bloomPass.radius = 0.6 + energy * 0.3;   // 0.6 to 0.9 (was 0.8 to 1.2)
     }
 
@@ -558,7 +579,7 @@ function animate() {
         // Animate Background Hue
         // Cycle roughly every 60 seconds
         const idleHue = (time * 0.05) % 1.0;
-        chamber.updateEnvironment(idleHue, 1.0); // Maintain high intensity
+        chamber.updateEnvironment(idleHue, 0.75); // Maintain high intensity (reduced 25%)
 
         // Dynamic Content Swapping
         // Every 2 seconds (approx), swap 1-2 objects

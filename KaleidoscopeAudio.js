@@ -505,6 +505,9 @@ export class KaleidoscopeAudio {
         if (!this.isInitialized) return;
         if (this.isPlaying) return;
 
+        // Randomize settings on start
+        this.randomizeSession();
+
         if (Tone.Transport.state !== 'started') {
             Tone.Transport.start();
         }
@@ -513,6 +516,55 @@ export class KaleidoscopeAudio {
         this.lastHihatTime = Tone.now();
 
         this.isPlaying = true;
+    }
+
+    randomizeSession() {
+        // Pick new Scale/Mode
+        const keys = this.scaleKeys;
+        this.currentScaleName = keys[Math.floor(Math.random() * keys.length)];
+        this.rootNote = Math.random() > 0.5 ? "C" : "A";
+
+        // Include all modes
+        const modes = ['ambient', 'choral', 'house', 'exotic_groove', 'tumbling', 'algorave'];
+        this.beatMode = modes[Math.floor(Math.random() * modes.length)];
+
+        // Randomize intensity slightly
+        this.intensity = 0.3 + Math.random() * 0.4;
+
+        console.log(`Audio Started with Mode: ${this.beatMode}, Scale: ${this.currentScaleName}`);
+
+        // Apply settings immediately
+        if (this.beatMode === 'algorave') {
+            this.dist.wet.value = 0.8;
+            Tone.Transport.bpm.value = 135 + Math.random() * 10;
+            if (this.reverb) this.reverb.decay = 2;
+            if (this.delay) this.delay.delayTime.value = "16n";
+        } else if (this.beatMode === 'house') {
+            this.dist.wet.value = 0.3;
+            Tone.Transport.bpm.value = 122 + Math.random() * 6;
+            if (this.reverb) this.reverb.decay = 4;
+            if (this.delay) this.delay.delayTime.value = "8n";
+        } else if (this.beatMode === 'choral' || this.beatMode === 'tumbling') {
+            this.dist.wet.value = 0.0;
+            Tone.Transport.bpm.value = 80;
+            if (this.reverb) this.reverb.decay = 12;
+            if (this.delay) this.delay.delayTime.value = "4n";
+        } else if (this.beatMode === 'exotic_groove') {
+            this.dist.wet.value = 0.1;
+            Tone.Transport.bpm.value = 95 + Math.random() * 10;
+            if (this.reverb) this.reverb.decay = 5;
+            if (this.delay) this.delay.delayTime.value = "8n.";
+        } else { // ambient
+            this.dist.wet.value = 0.0;
+            Tone.Transport.bpm.value = 110;
+            if (this.reverb) this.reverb.decay = 8;
+            if (this.delay) this.delay.delayTime.value = "4n";
+        }
+
+        // Signal to main.js that mode changed (for camera randomization)
+        if (window.onAudioModeChange) {
+            window.onAudioModeChange(this.beatMode);
+        }
     }
 
     stop() {
@@ -714,6 +766,11 @@ export class KaleidoscopeAudio {
                 if (this.nextSwitchId) Tone.Transport.clear(this.nextSwitchId);
                 // Also reset scheduler loop state if needed
                 this.remainingBars = 4;
+
+                // Signal to main.js that mode changed (for camera randomization AND speed slider)
+                if (window.onAudioModeChange) {
+                    window.onAudioModeChange(this.beatMode);
+                }
 
                 resolve();
             }, 2100);
